@@ -63,6 +63,7 @@ interface NativeMetaSnapshot {
   node: HTMLElement;
   originalNodes: Node[];
   numberText: string | null;
+  stateText: string;
   timeNode: Node | null;
   authorNode: Node | null;
 }

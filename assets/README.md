@@ -1,6 +1,6 @@
 # Asset Inventory
 
-This repository includes extension package icons and store-listing placeholder media.
+This repository includes extension package icons and a README screenshot.
 
 ## Extension package icons
 
@@ -12,18 +12,14 @@ This repository includes extension package icons and store-listing placeholder m
 
 These files are bundled into the Chrome and Firefox build outputs and referenced by `manifest.json`.
 
-## Store listing media
+## README preview
 
-- `assets/store/chrome-promo-440x280.png`
-- `assets/store/chrome-screenshot-1280x800.png`
+- `assets/store/image.png`
 
-These are starter assets so the repo has the correct file slots and exact dimensions documented. Replace them with final store artwork and real product screenshots before publishing.
+This is the product screenshot used in the repository README.
 
 ## Source templates
 
 - `assets/source/icon.svg`
-- `assets/source/chrome-promo-440x280.svg`
-- `assets/source/chrome-screenshot-1280x800.svg`
 
-Regenerate the PNGs from the SVG templates if the branding changes.
-
+Regenerate the extension icon PNGs from the SVG template if the branding changes.

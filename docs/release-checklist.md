@@ -4,7 +4,6 @@
 
 - `bun install`
 - `bun run check:release`
-- Replace placeholder listing media in `assets/store/` with final screenshots before submission
 - Run `bun run assets:generate` if you update the SVG source templates in `assets/source/`
 - Enable GitHub Pages from the `/docs` folder so the public URLs resolve
 - Confirm the generated artifacts exist in `artifacts/`
@@ -18,7 +17,7 @@
 - Create or open the Firefox Add-ons listing in AMO
 - Add the final support email address required by the dashboards
 - Set the homepage, privacy policy, and support URLs to the GitHub Pages URLs
-- Upload the final icon, promo image, and screenshots in each store dashboard
+- Upload the final icon and any store screenshots you want to use in each dashboard
 - Paste the short description, long description, and reviewer notes based on the README:
   Better GitHub PR View improves the readability and scanability of GitHub repository pull request list pages with native-looking inline metadata and lightweight row controls.
 - Select the final category in each store dashboard

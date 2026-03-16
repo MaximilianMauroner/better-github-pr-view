@@ -8,43 +8,36 @@ const jobs = [
     input: "assets/source/icon.svg",
     output: "assets/extension-icons/icon-16.png",
     width: 16,
-    height: 16
+    height: 16,
+    renderer: "sips"
   },
   {
     input: "assets/source/icon.svg",
     output: "assets/extension-icons/icon-32.png",
     width: 32,
-    height: 32
+    height: 32,
+    renderer: "sips"
   },
   {
     input: "assets/source/icon.svg",
     output: "assets/extension-icons/icon-48.png",
     width: 48,
-    height: 48
+    height: 48,
+    renderer: "sips"
   },
   {
     input: "assets/source/icon.svg",
     output: "assets/extension-icons/icon-96.png",
     width: 96,
-    height: 96
+    height: 96,
+    renderer: "sips"
   },
   {
     input: "assets/source/icon.svg",
     output: "assets/extension-icons/icon-128.png",
     width: 128,
-    height: 128
-  },
-  {
-    input: "assets/source/chrome-promo-440x280.svg",
-    output: "assets/store/chrome-promo-440x280.png",
-    width: 440,
-    height: 280
-  },
-  {
-    input: "assets/source/chrome-screenshot-1280x800.svg",
-    output: "assets/store/chrome-screenshot-1280x800.png",
-    width: 1280,
-    height: 800
+    height: 128,
+    renderer: "sips"
   }
 ] as const;
 
@@ -67,21 +60,22 @@ function run(command: string, args: string[]) {
   });
 }
 
+async function renderWithSips(input: string, output: string, width: number, height: number): Promise<void> {
+  await run("sips", ["-s", "format", "png", input, "--out", output]);
+  await run("sips", ["-z", String(height), String(width), output]);
+}
+
 async function main() {
   for (const job of jobs) {
+    const inputPath = path.join(repoRoot, job.input);
+    const outputPath = path.join(repoRoot, job.output);
+
     await mkdir(path.join(repoRoot, path.dirname(job.output)), { recursive: true });
-    await run("sips", [
-      "-s",
-      "format",
-      "png",
-      job.input,
-      "--out",
-      job.output
-    ]);
-    await run("sips", ["-z", String(job.height), String(job.width), job.output]);
+
+    await renderWithSips(inputPath, outputPath, job.width, job.height);
   }
 
-  console.log("Generated extension and listing assets.");
+  console.log("Generated extension icons.");
 }
 
 main().catch((error) => {

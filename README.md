@@ -2,6 +2,10 @@
 
 A minimal Manifest V3 browser extension that enriches GitHub repository pull request lists with native-looking metadata.
 
+![Example pull request list enriched by the extension](./assets/store/image.png)
+
+At a glance, the extension adds compact native-feeling metadata like merged or closed state, task progress, and line-change totals directly into each pull request row.
+
 ## What it does
 
 - Enhances repository `Pull requests` pages on `github.com`
@@ -53,7 +57,7 @@ src/
    bun install
    ```
 
-2. Generate icons and placeholder listing media when the SVG templates change:
+2. Generate extension icons when the SVG source changes:
 
    ```bash
    bun run assets:generate

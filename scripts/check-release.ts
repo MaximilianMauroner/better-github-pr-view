@@ -12,9 +12,7 @@ const requiredFiles = [
   "assets/extension-icons/icon-32.png",
   "assets/extension-icons/icon-48.png",
   "assets/extension-icons/icon-96.png",
-  "assets/extension-icons/icon-128.png",
-  "assets/store/chrome-promo-440x280.png",
-  "assets/store/chrome-screenshot-1280x800.png"
+  "assets/extension-icons/icon-128.png"
 ];
 
 async function assertFile(relativePath: string) {

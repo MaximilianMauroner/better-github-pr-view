@@ -288,6 +288,7 @@
   function buildNativeMetaSegments(baseRow: BaseRow, snapshot: NativeMetaSnapshot): Node[] {
     const segments: Node[] = [];
     const numberText = snapshot.numberText || (baseRow.number ? `#${baseRow.number}` : null);
+    const stateText = snapshot.stateText || "opened";
     const timeNode = snapshot.timeNode?.cloneNode(true) || null;
     const authorNode = snapshot.authorNode?.cloneNode(true) || null;
 
@@ -296,7 +297,7 @@
     }
 
     if (settings.nativeOpenedTime && timeNode) {
-      segments.push(document.createTextNode(segments.length > 0 ? " opened " : "opened "));
+      segments.push(document.createTextNode(segments.length > 0 ? ` ${stateText} ` : `${stateText} `));
       segments.push(timeNode);
     }
 
@@ -319,11 +320,17 @@
     }
 
     const metaNode = baseRow.metaNode;
+    const metaText = normalizeWhitespace(metaNode.textContent || "");
     metaNode.setAttribute(MANAGED_NATIVE_META_ATTR, "true");
     snapshot = {
       node: metaNode,
       originalNodes: Array.from(metaNode.childNodes, (node: ChildNode) => node.cloneNode(true)),
       numberText: baseRow.number ? `#${baseRow.number}` : (normalizeWhitespace(metaNode.textContent || "").match(/#\d+/)?.[0] || null),
+      stateText: metaText.includes(" was merged ")
+        ? "was merged"
+        : metaText.includes(" was closed ")
+          ? "was closed"
+          : "opened",
       timeNode: metaNode.querySelector("relative-time"),
       authorNode: metaNode.querySelector("a.Link--muted, a[data-hovercard-type='user'], a[title]")
     };
