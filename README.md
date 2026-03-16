@@ -115,31 +115,6 @@ Release flow:
 
 The release workflow fails if the pushed tag does not match `package.json`.
 
-## Manual submission
-
-### Chrome Web Store
-
-1. Register the developer account and pay the one-time registration fee.
-2. Upload `artifacts/better-github-pr-view-chrome-0.1.0.zip`.
-3. Use the product summary in this README and the submission notes in [`docs/release-checklist.md`](./docs/release-checklist.md) for the store form fields.
-4. Upload the final store media from `assets/store/`, replacing the placeholders first.
-5. Set:
-   - Homepage URL: `https://maximilianmauroner.github.io/better-github-pr-view/`
-   - Privacy policy URL: `https://maximilianmauroner.github.io/better-github-pr-view/privacy-policy.html`
-   - Support URL: `https://maximilianmauroner.github.io/better-github-pr-view/support.html`
-6. Add the final support email in the dashboard.
-7. Submit for review.
-
-### Firefox Add-ons
-
-1. Create the add-on entry in AMO.
-2. Upload `artifacts/better-github-pr-view-firefox-0.1.0.zip`.
-3. Use the product summary in this README and the submission notes in [`docs/release-checklist.md`](./docs/release-checklist.md) for the listing and reviewer fields.
-4. Upload the final icon and screenshots, replacing placeholder media first.
-5. Set the same homepage, privacy policy, and support URLs as above.
-6. Add the final support email in AMO if requested.
-7. Submit for review.
-
 ## Public submission pages
 
 - Homepage: [`docs/index.md`](./docs/index.md)
