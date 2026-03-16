@@ -20,11 +20,14 @@
   };
 
   const MAX_CONCURRENT_FETCHES = 4;
+  const HYDRATION_ROOT_MARGIN_PX = 320;
   const CACHE_VERSION = 9;
   const FRESH_CACHE_MS = 5 * 60 * 1000;
   const HARD_STALE_MS = 30 * 60 * 1000;
   const AUTO_REFRESH_COOLDOWN_MS = 2 * 60 * 1000;
   const AUTO_REFRESH_ERROR_COOLDOWN_MS = 5 * 60 * 1000;
+  const MANAGED_NATIVE_META_ATTR = "data-bgpv-managed-native-meta";
+  const CACHE_BUST_SIGNAL_KEY = "bgpvCacheBustAt";
 
   const hydrationCache = new Map();
   const nativeMetaCache = new Map();
@@ -293,6 +296,7 @@
     }
 
     const metaNode = baseRow.metaNode;
+    metaNode.setAttribute(MANAGED_NATIVE_META_ATTR, "true");
     snapshot = {
       node: metaNode,
       originalNodes: Array.from(metaNode.childNodes, (node) => node.cloneNode(true)),
@@ -356,7 +360,12 @@
   }
 
   function isManagedMetaElement(node) {
-    return node instanceof Element && (node.classList.contains("bgpv-inline-meta") || Boolean(node.closest(".bgpv-inline-meta")));
+    return node instanceof Element && (
+      node.classList.contains("bgpv-inline-meta") ||
+      Boolean(node.closest(".bgpv-inline-meta")) ||
+      node.getAttribute(MANAGED_NATIVE_META_ATTR) === "true" ||
+      Boolean(node.closest(`[${MANAGED_NATIVE_META_ATTR}="true"]`))
+    );
   }
 
   function shouldIgnoreMutations(mutations) {
@@ -398,7 +407,7 @@
 
     intersectionObserver = new IntersectionObserver(onRowIntersection, {
       root: null,
-      rootMargin: "320px 0px",
+      rootMargin: `${HYDRATION_ROOT_MARGIN_PX}px 0px`,
       threshold: 0
     });
   }
@@ -788,6 +797,8 @@
     const pageKeyAtStart = currentPageKey;
     const epochAtStart = renderEpoch;
     const previousData = cacheEntry.data;
+    let nextRenderData = previousData;
+    let shouldRemoveMetadata = !previousData;
 
     cacheEntry.isRefreshing = true;
     cacheEntry.refreshUiMode = interactive ? "interactive" : null;
@@ -800,24 +811,13 @@
     getHydratedPrData(baseRow.prUrl, { forceRefresh: true })
       .then((hydratedData) => {
         cacheEntry.lastRefreshErrorAt = null;
-        if (!document.contains(row) || currentPageKey !== pageKeyAtStart || !canRenderForEpoch(epochAtStart)) {
-          return;
-        }
-
-        renderRowMetadata(baseRow, hydratedData);
+        nextRenderData = hydratedData;
+        shouldRemoveMetadata = false;
       })
       .catch(() => {
         cacheEntry.lastRefreshErrorAt = Date.now();
-        if (!document.contains(row) || currentPageKey !== pageKeyAtStart || !canRenderForEpoch(epochAtStart)) {
-          return;
-        }
-
-        if (previousData) {
-          renderRowMetadata(baseRow, previousData);
-          return;
-        }
-
-        removeRowMetadata(row);
+        nextRenderData = previousData;
+        shouldRemoveMetadata = !previousData;
       })
       .finally(() => {
         cacheEntry.isRefreshing = false;
@@ -827,9 +827,12 @@
           return;
         }
 
-        if (cacheEntry.data) {
-          renderRowMetadata(baseRow, cacheEntry.data);
+        if (shouldRemoveMetadata) {
+          removeRowMetadata(row);
+          return;
         }
+
+        renderRowMetadata(baseRow, nextRenderData);
       });
   }
 
@@ -915,6 +918,11 @@
     refreshTimer = window.setTimeout(refresh, 120);
   }
 
+  function invalidateHydrationState() {
+    resetPageState();
+    scheduleRefresh();
+  }
+
   function installObservers() {
     const mutationObserver = new MutationObserver((mutations) => {
       if (shouldIgnoreMutations(mutations)) {
@@ -940,11 +948,14 @@
   });
 
   chrome.storage.onChanged.addListener((changes, areaName) => {
-    if (areaName !== "sync" || !changes.bgpvSettings) {
+    if (areaName === "sync" && changes.bgpvSettings) {
+      settings = { ...DEFAULT_SETTINGS, ...changes.bgpvSettings.newValue };
+      scheduleRefresh();
       return;
     }
 
-    settings = { ...DEFAULT_SETTINGS, ...changes.bgpvSettings.newValue };
-    scheduleRefresh();
+    if (areaName === "sync" && changes[CACHE_BUST_SIGNAL_KEY]) {
+      invalidateHydrationState();
+    }
   });
 })();

@@ -15,6 +15,7 @@
   const settingsPane = document.getElementById("settingsPane");
   const clearCacheButton = document.getElementById("clearCache");
   const cacheStatus = document.getElementById("cacheStatus");
+  const CACHE_BUST_SIGNAL_KEY = "bgpvCacheBustAt";
   let statusTimer = null;
 
   function syncEnabledState(settings) {
@@ -66,17 +67,19 @@
 
     chrome.storage.local.get(null, (items) => {
       const cacheKeys = Object.keys(items).filter((key) => key.startsWith("bgpv:pr:"));
+      const finish = () => {
+        chrome.storage.sync.set({ [CACHE_BUST_SIGNAL_KEY]: Date.now() }, () => {
+          clearCacheButton.disabled = false;
+          setStatus("Cache cleared");
+        });
+      };
 
       if (cacheKeys.length === 0) {
-        clearCacheButton.disabled = false;
-        setStatus("Cache already empty");
+        finish();
         return;
       }
 
-      chrome.storage.local.remove(cacheKeys, () => {
-        clearCacheButton.disabled = false;
-        setStatus("Cache cleared");
-      });
+      chrome.storage.local.remove(cacheKeys, finish);
     });
   }
 
