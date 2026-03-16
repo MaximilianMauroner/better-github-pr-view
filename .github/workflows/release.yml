@@ -14,7 +14,7 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Bun
         uses: oven-sh/setup-bun@v2
@@ -32,14 +32,14 @@ jobs:
         run: bun run check:release
 
       - name: Upload Chrome ZIP
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: better-github-pr-view-chrome-${{ github.ref_name }}
           path: artifacts/better-github-pr-view-chrome-*.zip
           if-no-files-found: error
 
       - name: Upload Firefox ZIP
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: better-github-pr-view-firefox-${{ github.ref_name }}
           path: artifacts/better-github-pr-view-firefox-*.zip
