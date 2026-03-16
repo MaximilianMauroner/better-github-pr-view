@@ -57,20 +57,14 @@ src/
    bun install
    ```
 
-2. Generate extension icons when the SVG source changes:
-
-   ```bash
-   bun run assets:generate
-   ```
-
-3. Create browser-specific builds:
+2. Create browser-specific builds:
 
    ```bash
    bun run build:chrome
    bun run build:firefox
    ```
 
-4. Create upload artifacts:
+3. Create upload artifacts:
 
    ```bash
    bun run pack:chrome

@@ -4,7 +4,6 @@
 
 - `bun install`
 - `bun run check:release`
-- Run `bun run assets:generate` if you update the SVG source templates in `assets/source/`
 - Enable GitHub Pages from the `/docs` folder so the public URLs resolve
 - Confirm the generated artifacts exist in `artifacts/`
 - Confirm the latest GitHub Actions run uploaded both ZIP artifacts

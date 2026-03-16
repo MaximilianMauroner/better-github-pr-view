@@ -6,7 +6,6 @@
   "type": "module",
   "packageManager": "bun@1.3.6",
   "scripts": {
-    "assets:generate": "bun run scripts/generate-assets.ts",
     "build": "bun run build:chrome && bun run build:firefox",
     "build:chrome": "bun run scripts/build.ts chrome",
     "build:firefox": "bun run scripts/build.ts firefox",
