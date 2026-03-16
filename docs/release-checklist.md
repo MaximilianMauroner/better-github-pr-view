@@ -2,12 +2,14 @@
 
 ## Repo-managed items
 
-- `npm install`
-- `npm run check:release`
+- `bun install`
+- `bun run check:release`
 - Replace placeholder listing media in `assets/store/` with final screenshots before submission
-- Run `npm run assets:generate` if you update the SVG source templates in `assets/source/`
+- Run `bun run assets:generate` if you update the SVG source templates in `assets/source/`
 - Enable GitHub Pages from the `/docs` folder so the public URLs resolve
 - Confirm the generated artifacts exist in `artifacts/`
+- Confirm the latest GitHub Actions run uploaded both ZIP artifacts
+- For a store release, push a matching `vX.Y.Z` tag and confirm the GitHub Release page has both ZIP assets attached
 - Review the README product summary and update it if the extension scope changes
 
 ## Dashboard-only items

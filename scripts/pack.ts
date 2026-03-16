@@ -1,19 +1,12 @@
 import { mkdir, readFile, rm } from "node:fs/promises";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { spawn } from "node:child_process";
+import { assertBrowser, buildArtifactSlug, repoRoot } from "./common.js";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const repoRoot = path.resolve(__dirname, "..");
-const browser = process.argv[2];
+const browser = assertBrowser(process.argv[2]);
 
-if (!["chrome", "firefox"].includes(browser)) {
-  console.error("Usage: node scripts/pack.mjs <chrome|firefox>");
-  process.exit(1);
-}
-
-function run(command, args, cwd) {
-  return new Promise((resolve, reject) => {
+function run(command: string, args: string[], cwd: string) {
+  return new Promise<void>((resolve, reject) => {
     const child = spawn(command, args, { cwd, stdio: "inherit" });
 
     child.on("error", reject);
@@ -30,8 +23,11 @@ function run(command, args, cwd) {
 
 async function main() {
   const manifestPath = path.join(repoRoot, "dist", browser, "manifest.json");
-  const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
-  const slug = manifest.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+  const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as {
+    name: string;
+    version: string;
+  };
+  const slug = buildArtifactSlug(manifest.name);
   const artifactDir = path.join(repoRoot, "artifacts");
   const artifactName = `${slug}-${browser}-${manifest.version}.zip`;
   const artifactPath = path.join(artifactDir, artifactName);
@@ -44,7 +40,6 @@ async function main() {
 }
 
 main().catch((error) => {
-  console.error(error);
+  console.error(error instanceof Error ? error.message : String(error));
   process.exit(1);
 });
-

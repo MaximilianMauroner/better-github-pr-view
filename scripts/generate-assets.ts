@@ -1,10 +1,7 @@
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { spawn } from "node:child_process";
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const repoRoot = path.resolve(__dirname, "..");
+import { repoRoot } from "./common.js";
 
 const jobs = [
   {
@@ -49,10 +46,10 @@ const jobs = [
     width: 1280,
     height: 800
   }
-];
+] as const;
 
-function run(command, args) {
-  return new Promise((resolve, reject) => {
+function run(command: string, args: string[]) {
+  return new Promise<void>((resolve, reject) => {
     const child = spawn(command, args, {
       cwd: repoRoot,
       stdio: "inherit"
@@ -88,6 +85,6 @@ async function main() {
 }
 
 main().catch((error) => {
-  console.error(error.message);
+  console.error(error instanceof Error ? error.message : String(error));
   process.exit(1);
 });

@@ -1,9 +1,6 @@
 import { access, readFile } from "node:fs/promises";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const repoRoot = path.resolve(__dirname, "..");
+import { readPackageManifest, repoRoot } from "./common.js";
 
 const requiredFiles = [
   "docs/index.md",
@@ -20,15 +17,20 @@ const requiredFiles = [
   "assets/store/chrome-screenshot-1280x800.png"
 ];
 
-async function assertFile(relativePath) {
+async function assertFile(relativePath: string) {
   await access(path.join(repoRoot, relativePath));
 }
 
 async function main() {
+  const packageManifest = await readPackageManifest();
   await Promise.all(requiredFiles.map(assertFile));
 
-  const chromeManifest = JSON.parse(await readFile(path.join(repoRoot, "dist", "chrome", "manifest.json"), "utf8"));
-  const firefoxManifest = JSON.parse(await readFile(path.join(repoRoot, "dist", "firefox", "manifest.json"), "utf8"));
+  const chromeManifest = JSON.parse(await readFile(path.join(repoRoot, "dist", "chrome", "manifest.json"), "utf8")) as Record<string, any>;
+  const firefoxManifest = JSON.parse(await readFile(path.join(repoRoot, "dist", "firefox", "manifest.json"), "utf8")) as Record<string, any>;
+
+  if (chromeManifest.version !== packageManifest.version || firefoxManifest.version !== packageManifest.version) {
+    throw new Error("Build outputs must use the version declared in package.json.");
+  }
 
   if (!chromeManifest.icons?.["128"]) {
     throw new Error("Chrome build is missing a 128px icon.");
@@ -47,6 +49,6 @@ async function main() {
 }
 
 main().catch((error) => {
-  console.error(error.message);
+  console.error(error instanceof Error ? error.message : String(error));
   process.exit(1);
 });

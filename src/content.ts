@@ -1,5 +1,18 @@
 (function () {
-  const DEFAULT_SETTINGS = {
+  interface DiffstatPayload {
+    diffstat?: {
+      linesAdded?: number;
+      linesDeleted?: number;
+    };
+  }
+
+  interface FetchQueueItem<T> {
+    taskFactory: () => Promise<T>;
+    resolve: (value: T | PromiseLike<T>) => void;
+    reject: (reason?: unknown) => void;
+  }
+
+  const DEFAULT_SETTINGS: Settings = {
     prListEnrichment: true,
     locChanges: true,
     lastEditedTime: true,
@@ -29,22 +42,26 @@
   const MANAGED_NATIVE_META_ATTR = "data-bgpv-managed-native-meta";
   const CACHE_BUST_SIGNAL_KEY = "bgpvCacheBustAt";
 
-  const hydrationCache = new Map();
-  const nativeMetaCache = new Map();
-  let settings = { ...DEFAULT_SETTINGS };
-  let refreshTimer = null;
+  const hydrationCache = new Map<string, CacheEntry>();
+  const nativeMetaCache = new Map<Element, NativeMetaSnapshot>();
+  let settings: Settings = { ...DEFAULT_SETTINGS };
+  let refreshTimer: number | null = null;
   let currentPageKey = "";
   let renderEpoch = 0;
-  let intersectionObserver = null;
-  let observedRows = new WeakSet();
+  let intersectionObserver: IntersectionObserver | null = null;
+  let observedRows = new WeakSet<Element>();
   let activeFetches = 0;
-  const fetchQueue = [];
+  const fetchQueue: FetchQueueItem<LocMetricsResult | LastEditedMetricsResult | null>[] = [];
 
-  function getStorageKey(prUrl) {
+  function getStorageArea(area: StorageArea): chrome.storage.StorageArea {
+    return area === "local" ? chrome.storage.local : chrome.storage.sync;
+  }
+
+  function getStorageKey(prUrl: string): string {
     return `bgpv:pr:${prUrl}`;
   }
 
-  function ensureCacheEntry(prUrl) {
+  function ensureCacheEntry(prUrl: string): CacheEntry {
     let entry = hydrationCache.get(prUrl);
     if (!entry) {
       entry = {
@@ -63,19 +80,22 @@
     return entry;
   }
 
-  function chromeStorageGet(area, keys) {
+  function chromeStorageGet(
+    area: StorageArea,
+    keys: string[] | Record<string, unknown> | null
+  ): Promise<Record<string, unknown>> {
     return new Promise((resolve) => {
-      chrome.storage[area].get(keys, resolve);
+      getStorageArea(area).get(keys, (items) => resolve(items as Record<string, unknown>));
     });
   }
 
-  function chromeStorageSet(area, value) {
+  function chromeStorageSet(area: StorageArea, value: Record<string, unknown>): Promise<void> {
     return new Promise((resolve) => {
-      chrome.storage[area].set(value, resolve);
+      getStorageArea(area).set(value, () => resolve());
     });
   }
 
-  function hasCompleteCachedData(data) {
+  function hasCompleteCachedData(data: HydratedPrData | null): boolean {
     if (!data) {
       return false;
     }
@@ -91,19 +111,20 @@
     return true;
   }
 
-  function buildPersistedPayload(data) {
+  function buildPersistedPayload(data: HydratedPrData): PersistedPayload {
     return {
       version: CACHE_VERSION,
       data
     };
   }
 
-  function readPersistedPayload(payload) {
-    if (!payload || payload.version !== CACHE_VERSION || !payload.data) {
+  function readPersistedPayload(payload: unknown): HydratedPrData | null {
+    const typedPayload = payload as Partial<PersistedPayload> | null;
+    if (!typedPayload || typedPayload.version !== CACHE_VERSION || !typedPayload.data) {
       return null;
     }
 
-    return payload.data;
+    return typedPayload.data;
   }
 
   function isPullListPage() {
@@ -114,15 +135,15 @@
     return `${window.location.pathname}${window.location.search}`;
   }
 
-  function normalizeWhitespace(value) {
+  function normalizeWhitespace(value: string): string {
     return value.replace(/\s+/g, " ").trim();
   }
 
-  function getFetchedAt(data) {
+  function getFetchedAt(data: HydratedPrData | null): string | null {
     return data?.fetchedAt || null;
   }
 
-  function getFreshnessAgeMs(data) {
+  function getFreshnessAgeMs(data: HydratedPrData | null): number {
     const fetchedAt = getFetchedAt(data);
     if (!fetchedAt) {
       return Number.POSITIVE_INFINITY;
@@ -136,7 +157,7 @@
     return Math.max(0, Date.now() - timestamp);
   }
 
-  function getFreshnessState(data) {
+  function getFreshnessState(data: HydratedPrData | null): FreshnessState {
     const ageMs = getFreshnessAgeMs(data);
     if (ageMs <= FRESH_CACHE_MS) {
       return "fresh";
@@ -149,7 +170,7 @@
     return "hard_stale";
   }
 
-  function shouldFetchCodeMetrics(data, forceRefresh) {
+  function shouldFetchCodeMetrics(data: HydratedPrData | null, forceRefresh: boolean): boolean {
     if (!settings.locChanges) {
       return false;
     }
@@ -165,7 +186,7 @@
     return false;
   }
 
-  function shouldFetchLastEdited(data, forceRefresh) {
+  function shouldFetchLastEdited(data: HydratedPrData | null, forceRefresh: boolean): boolean {
     if (!settings.lastEditedTime) {
       return false;
     }
@@ -181,7 +202,7 @@
     return false;
   }
 
-  function shouldSkipAutoRefresh(cacheEntry) {
+  function shouldSkipAutoRefresh(cacheEntry: CacheEntry): boolean {
     if (!cacheEntry.data || cacheEntry.isRefreshing) {
       return true;
     }
@@ -202,7 +223,7 @@
     return false;
   }
 
-  function getRows() {
+  function getRows(): Element[] {
     const rows = [
       ...Array.from(document.querySelectorAll(SELECTORS.modernRows)),
       ...Array.from(document.querySelectorAll(SELECTORS.classicRows))
@@ -214,15 +235,17 @@
     });
   }
 
-  function getTitleLink(row) {
-    return row.querySelector(SELECTORS.modernTitleLink) || row.querySelector(SELECTORS.classicTitleLink);
+  function getTitleLink(row: ParentNode): HTMLAnchorElement | null {
+    return row.querySelector<HTMLAnchorElement>(SELECTORS.modernTitleLink)
+      || row.querySelector<HTMLAnchorElement>(SELECTORS.classicTitleLink);
   }
 
-  function getNativeMetaNode(row) {
-    return row.querySelector(SELECTORS.modernMeta) || row.querySelector(SELECTORS.classicMeta);
+  function getNativeMetaNode(row: ParentNode): HTMLElement | null {
+    return row.querySelector<HTMLElement>(SELECTORS.modernMeta)
+      || row.querySelector<HTMLElement>(SELECTORS.classicMeta);
   }
 
-  function isDraftRow(row, metaNode) {
+  function isDraftRow(row: ParentNode, metaNode: HTMLElement | null): boolean {
     if (row.querySelector('[aria-label="Draft Pull Request"], .octicon-git-pull-request-draft, [data-status="draft"]')) {
       return true;
     }
@@ -231,7 +254,7 @@
     return /\bDraft\b/.test(metaText);
   }
 
-  function parseBaseRow(row) {
+  function parseBaseRow(row: Element): BaseRow | null {
     const titleLink = getTitleLink(row);
     if (!titleLink) {
       return null;
@@ -258,12 +281,12 @@
     };
   }
 
-  function removeInjectedMetadata(target = document) {
+  function removeInjectedMetadata(target: ParentNode = document): void {
     target.querySelectorAll(".bgpv-inline-meta").forEach((node) => node.remove());
   }
 
-  function buildNativeMetaSegments(baseRow, snapshot) {
-    const segments = [];
+  function buildNativeMetaSegments(baseRow: BaseRow, snapshot: NativeMetaSnapshot): Node[] {
+    const segments: Node[] = [];
     const numberText = snapshot.numberText || (baseRow.number ? `#${baseRow.number}` : null);
     const timeNode = snapshot.timeNode?.cloneNode(true) || null;
     const authorNode = snapshot.authorNode?.cloneNode(true) || null;
@@ -285,7 +308,7 @@
     return segments;
   }
 
-  function ensureNativeMetaSnapshot(baseRow) {
+  function ensureNativeMetaSnapshot(baseRow: BaseRow): NativeMetaSnapshot | null {
     if (!baseRow.metaNode) {
       return null;
     }
@@ -299,7 +322,7 @@
     metaNode.setAttribute(MANAGED_NATIVE_META_ATTR, "true");
     snapshot = {
       node: metaNode,
-      originalNodes: Array.from(metaNode.childNodes, (node) => node.cloneNode(true)),
+      originalNodes: Array.from(metaNode.childNodes, (node: ChildNode) => node.cloneNode(true)),
       numberText: baseRow.number ? `#${baseRow.number}` : (normalizeWhitespace(metaNode.textContent || "").match(/#\d+/)?.[0] || null),
       timeNode: metaNode.querySelector("relative-time"),
       authorNode: metaNode.querySelector("a.Link--muted, a[data-hovercard-type='user'], a[title]")
@@ -309,7 +332,7 @@
     return snapshot;
   }
 
-  function restoreNativeMetadata(target = document) {
+  function restoreNativeMetadata(target: ParentNode = document): void {
     nativeMetaCache.forEach((snapshot, row) => {
       if (!target.contains(row) || !snapshot.node.isConnected) {
         return;
@@ -319,12 +342,12 @@
       snapshot.node.replaceChildren(...snapshot.originalNodes.map((node) => node.cloneNode(true)));
     });
 
-    target.querySelectorAll("tracked-issues-progress").forEach((node) => {
+    target.querySelectorAll<HTMLElement>("tracked-issues-progress").forEach((node) => {
       node.hidden = false;
     });
   }
 
-  function applyNativeMetaSettings(baseRow) {
+  function applyNativeMetaSettings(baseRow: BaseRow): void {
     const snapshot = ensureNativeMetaSnapshot(baseRow);
     if (!snapshot) {
       return;
@@ -332,7 +355,7 @@
 
     if (settings.nativePrNumber && settings.nativeOpenedTime && settings.nativeAuthor) {
       snapshot.node.hidden = false;
-      snapshot.node.replaceChildren(...snapshot.originalNodes.map((node) => node.cloneNode(true)));
+      snapshot.node.replaceChildren(...snapshot.originalNodes.map((node: Node) => node.cloneNode(true)));
       return;
     }
 
@@ -341,8 +364,8 @@
     snapshot.node.hidden = segments.length === 0;
   }
 
-  function applyNativeTaskSettings(baseRow) {
-    const taskProgressNode = baseRow.row.querySelector("tracked-issues-progress");
+  function applyNativeTaskSettings(baseRow: BaseRow): void {
+    const taskProgressNode = baseRow.row.querySelector<HTMLElement>("tracked-issues-progress");
     if (!taskProgressNode) {
       return;
     }
@@ -350,16 +373,16 @@
     taskProgressNode.hidden = !settings.nativeTasks;
   }
 
-  function applyNativeRowSettings(baseRow) {
+  function applyNativeRowSettings(baseRow: BaseRow): void {
     applyNativeMetaSettings(baseRow);
     applyNativeTaskSettings(baseRow);
   }
 
-  function removeRowMetadata(row) {
+  function removeRowMetadata(row: Element): void {
     row.querySelector(".bgpv-inline-meta")?.remove();
   }
 
-  function isManagedMetaElement(node) {
+  function isManagedMetaElement(node: Node | null): boolean {
     return node instanceof Element && (
       node.classList.contains("bgpv-inline-meta") ||
       Boolean(node.closest(".bgpv-inline-meta")) ||
@@ -368,11 +391,11 @@
     );
   }
 
-  function shouldIgnoreMutations(mutations) {
+  function shouldIgnoreMutations(mutations: MutationRecord[]): boolean {
     return mutations.every((mutation) => {
       const changedNodes = [...mutation.addedNodes, ...mutation.removedNodes]
         .map((node) => (node instanceof Element ? node : node.parentElement))
-        .filter(Boolean);
+        .filter((node): node is Element => Boolean(node));
 
       if (changedNodes.length === 0) {
         return true;
@@ -396,7 +419,7 @@
     nativeMetaCache.clear();
   }
 
-  function canRenderForEpoch(epoch) {
+  function canRenderForEpoch(epoch: number): boolean {
     return epoch === renderEpoch && isPullListPage() && settings.prListEnrichment;
   }
 
@@ -421,11 +444,11 @@
       }
 
       observedRows.add(row);
-      intersectionObserver.observe(row);
+      intersectionObserver?.observe(row);
     });
   }
 
-  function onRowIntersection(entries) {
+  function onRowIntersection(entries: IntersectionObserverEntry[]): void {
     entries.forEach((entry) => {
       if (!entry.isIntersecting) {
         return;
@@ -435,9 +458,11 @@
     });
   }
 
-  function enqueueFetch(taskFactory) {
+  function enqueueFetch<T extends LocMetricsResult | LastEditedMetricsResult | null>(
+    taskFactory: () => Promise<T>
+  ): Promise<T> {
     return new Promise((resolve, reject) => {
-      fetchQueue.push({ taskFactory, resolve, reject });
+      fetchQueue.push({ taskFactory, resolve, reject } as unknown as FetchQueueItem<LocMetricsResult | LastEditedMetricsResult | null>);
       pumpFetchQueue();
     });
   }
@@ -445,6 +470,9 @@
   function pumpFetchQueue() {
     while (activeFetches < MAX_CONCURRENT_FETCHES && fetchQueue.length > 0) {
       const next = fetchQueue.shift();
+      if (!next) {
+        continue;
+      }
       activeFetches += 1;
 
       next.taskFactory()
@@ -456,7 +484,7 @@
     }
   }
 
-  async function fetchJson(url) {
+  async function fetchJson<T>(url: string): Promise<T> {
     const response = await fetch(url, {
       credentials: "same-origin",
       headers: {
@@ -469,10 +497,10 @@
       throw new Error(`Failed to fetch ${url}: ${response.status}`);
     }
 
-    return response.json();
+    return response.json() as Promise<T>;
   }
 
-  async function fetchDocument(url) {
+  async function fetchDocument(url: string): Promise<Document> {
     const response = await fetch(url, {
       credentials: "same-origin"
     });
@@ -485,7 +513,7 @@
     return new DOMParser().parseFromString(html, "text/html");
   }
 
-  function formatRelativeTime(timestamp) {
+  function formatRelativeTime(timestamp: string): string | null {
     const target = Date.parse(timestamp);
     if (!Number.isFinite(target)) {
       return null;
@@ -507,10 +535,10 @@
     return `${value}${unit.suffix} ago`;
   }
 
-  function extractLastEditedAt(detailDocument) {
-    const timestamps = Array.from(detailDocument.querySelectorAll("relative-time[datetime]"))
+  function extractLastEditedAt(detailDocument: Document): string | null {
+    const timestamps = Array.from(detailDocument.querySelectorAll<HTMLElement>("relative-time[datetime]"))
       .map((node) => node.getAttribute("datetime"))
-      .filter(Boolean)
+      .filter((value): value is string => Boolean(value))
       .map((value) => Date.parse(value))
       .filter((value) => Number.isFinite(value));
 
@@ -521,12 +549,12 @@
     return new Date(Math.max(...timestamps)).toISOString();
   }
 
-  async function fetchLocMetrics(prUrl) {
+  async function fetchLocMetrics(prUrl: string): Promise<LocMetricsResult> {
     const baseUrl = prUrl.replace(/\/$/, "");
     let locChanges = null;
 
     try {
-      const diffstatPayload = await fetchJson(`${baseUrl}/page_data/diffstat`);
+      const diffstatPayload = await fetchJson<DiffstatPayload>(`${baseUrl}/page_data/diffstat`);
       const diffstat = diffstatPayload?.diffstat;
       if (diffstat && (typeof diffstat.linesAdded === "number" || typeof diffstat.linesDeleted === "number")) {
         locChanges = {
@@ -542,7 +570,7 @@
     };
   }
 
-  async function fetchLastEditedMetrics(prUrl) {
+  async function fetchLastEditedMetrics(prUrl: string): Promise<LastEditedMetricsResult> {
     let lastActivityAt = null;
 
     try {
@@ -556,10 +584,10 @@
     };
   }
 
-  async function warmPersistentCache(rows) {
+  async function warmPersistentCache(rows: Element[]): Promise<void> {
     const baseRows = rows
       .map(parseBaseRow)
-      .filter(Boolean);
+      .filter((baseRow): baseRow is BaseRow => Boolean(baseRow));
 
     const missing = baseRows
       .filter((baseRow) => !ensureCacheEntry(baseRow.prUrl).loadedFromStorage)
@@ -569,7 +597,7 @@
       return;
     }
 
-    const storageKeys = missing.reduce((accumulator, prUrl) => {
+    const storageKeys = missing.reduce<Record<string, null>>((accumulator, prUrl) => {
       accumulator[getStorageKey(prUrl)] = null;
       return accumulator;
     }, {});
@@ -588,13 +616,13 @@
     });
   }
 
-  async function persistHydratedData(prUrl, data) {
+  async function persistHydratedData(prUrl: string, data: HydratedPrData): Promise<void> {
     await chromeStorageSet("local", {
       [getStorageKey(prUrl)]: buildPersistedPayload(data)
     });
   }
 
-  async function getHydratedPrData(prUrl, options = {}) {
+  async function getHydratedPrData(prUrl: string, options: { forceRefresh?: boolean } = {}): Promise<HydratedPrData> {
     const { forceRefresh = false } = options;
     const cacheEntry = ensureCacheEntry(prUrl);
 
@@ -613,13 +641,13 @@
       cacheEntry.detailPromise = enqueueFetch(() => fetchLastEditedMetrics(prUrl).catch(() => null));
     }
 
-    let nextData = {
-      ...cacheEntry.data,
+    let nextData: HydratedPrData = {
+      ...(cacheEntry.data ?? {}),
       prUrl
-    }
+    };
 
     if (needsCodeMetrics) {
-      let filesData;
+      let filesData: LocMetricsResult | null;
       try {
         filesData = await cacheEntry.filesPromise;
       } finally {
@@ -636,7 +664,7 @@
     }
 
     if (needsLastEdited) {
-      let detailData;
+      let detailData: LastEditedMetricsResult | null;
       try {
         detailData = await cacheEntry.detailPromise;
       } finally {
@@ -663,7 +691,7 @@
     return persistedData;
   }
 
-  function createMetaItem(text, tone) {
+  function createMetaItem(text: string, tone?: string): HTMLSpanElement {
     const item = document.createElement("span");
     item.className = "bgpv-inline-meta__item";
     if (tone) {
@@ -673,7 +701,7 @@
     return item;
   }
 
-  function createLocItem(locChanges) {
+  function createLocItem(locChanges: LocChanges): HTMLSpanElement {
     const item = document.createElement("span");
     item.className = "bgpv-inline-meta__item bgpv-inline-meta__loc";
 
@@ -689,7 +717,10 @@
     return item;
   }
 
-  function getFreshnessDescriptor(data, cacheEntry) {
+  function getFreshnessDescriptor(
+    data: HydratedPrData | null,
+    cacheEntry: CacheEntry
+  ): { text: string; tone: string; freshness: FreshnessState } | null {
     if (!data?.fetchedAt) {
       return null;
     }
@@ -716,7 +747,11 @@
     };
   }
 
-  function createRefreshItem(baseRow, hydratedData, cacheEntry) {
+  function createRefreshItem(
+    baseRow: BaseRow,
+    hydratedData: HydratedPrData,
+    cacheEntry: CacheEntry
+  ): HTMLButtonElement | null {
     const descriptor = getFreshnessDescriptor(hydratedData, cacheEntry);
     if (!descriptor) {
       return null;
@@ -737,8 +772,8 @@
     return item;
   }
 
-  function buildMetadataItems(baseRow, hydratedData, cacheEntry) {
-    const items = [];
+  function buildMetadataItems(baseRow: BaseRow, hydratedData: HydratedPrData, cacheEntry: CacheEntry): HTMLElement[] {
+    const items: HTMLElement[] = [];
 
     if (settings.locChanges && hydratedData.locChanges) {
       items.push(createLocItem(hydratedData.locChanges));
@@ -761,7 +796,7 @@
     return items;
   }
 
-  function renderRowMetadata(baseRow, hydratedData) {
+  function renderRowMetadata(baseRow: BaseRow, hydratedData: HydratedPrData): void {
     removeRowMetadata(baseRow.row);
     applyNativeRowSettings(baseRow);
 
@@ -778,7 +813,7 @@
     baseRow.insertionPoint.appendChild(container);
   }
 
-  function refreshRow(row, options = {}) {
+  function refreshRow(row: Element, options: { interactive?: boolean } = {}): void {
     if (!isPullListPage() || !settings.prListEnrichment || !document.contains(row)) {
       return;
     }
@@ -832,11 +867,16 @@
           return;
         }
 
+        if (!nextRenderData) {
+          removeRowMetadata(row);
+          return;
+        }
+
         renderRowMetadata(baseRow, nextRenderData);
       });
   }
 
-  async function hydrateVisibleRow(row) {
+  async function hydrateVisibleRow(row: Element): Promise<void> {
     if (!isPullListPage() || !settings.prListEnrichment || !document.contains(row)) {
       return;
     }
@@ -876,7 +916,7 @@
     }
   }
 
-  function refresh() {
+  function refresh(): void {
     const nextPageKey = getPageKey();
     if (nextPageKey !== currentPageKey) {
       currentPageKey = nextPageKey;
@@ -913,17 +953,19 @@
       });
   }
 
-  function scheduleRefresh() {
-    window.clearTimeout(refreshTimer);
+  function scheduleRefresh(): void {
+    if (refreshTimer !== null) {
+      window.clearTimeout(refreshTimer);
+    }
     refreshTimer = window.setTimeout(refresh, 120);
   }
 
-  function invalidateHydrationState() {
+  function invalidateHydrationState(): void {
     resetPageState();
     scheduleRefresh();
   }
 
-  function installObservers() {
+  function installObservers(): void {
     const mutationObserver = new MutationObserver((mutations) => {
       if (shouldIgnoreMutations(mutations)) {
         return;
@@ -942,14 +984,17 @@
   }
 
   chrome.storage.sync.get({ bgpvSettings: DEFAULT_SETTINGS }, (result) => {
-    settings = { ...DEFAULT_SETTINGS, ...result.bgpvSettings };
+    settings = { ...DEFAULT_SETTINGS, ...(result.bgpvSettings as Partial<Settings> | undefined) };
     refresh();
     installObservers();
   });
 
   chrome.storage.onChanged.addListener((changes, areaName) => {
     if (areaName === "sync" && changes.bgpvSettings) {
-      settings = { ...DEFAULT_SETTINGS, ...changes.bgpvSettings.newValue };
+      settings = {
+        ...DEFAULT_SETTINGS,
+        ...((changes.bgpvSettings.newValue as Partial<Settings> | undefined) ?? {})
+      };
       scheduleRefresh();
       return;
     }

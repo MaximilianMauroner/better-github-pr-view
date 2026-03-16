@@ -1,0 +1,54 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.6
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Verify tag matches package version
+        run: |
+          bun -e 'const pkg = JSON.parse(await Bun.file("package.json").text()); const expected = `v${pkg.version}`; const actual = process.env.GITHUB_REF_NAME; if (actual !== expected) { throw new Error(`Tag ${actual} does not match package.json version ${expected}`); }'
+
+      - name: Validate and package release artifacts
+        run: bun run check:release
+
+      - name: Upload Chrome ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: better-github-pr-view-chrome-${{ github.ref_name }}
+          path: artifacts/better-github-pr-view-chrome-*.zip
+          if-no-files-found: error
+
+      - name: Upload Firefox ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: better-github-pr-view-firefox-${{ github.ref_name }}
+          path: artifacts/better-github-pr-view-firefox-*.zip
+          if-no-files-found: error
+
+      - name: Publish GitHub Release assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            artifacts/better-github-pr-view-chrome-*.zip
+            artifacts/better-github-pr-view-firefox-*.zip
+          generate_release_notes: true
