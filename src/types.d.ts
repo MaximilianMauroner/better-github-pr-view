@@ -1,12 +1,15 @@
 interface Settings {
   prListEnrichment: boolean;
+  branchSummary: boolean;
   commitCount: boolean;
   filesChanged: boolean;
   locChanges: boolean;
   lastEditedTime: boolean;
+  autoRefreshAfterHours: number;
   nativePrNumber: boolean;
   nativeOpenedTime: boolean;
   nativeAuthor: boolean;
+  nativeDraft: boolean;
   nativeTasks: boolean;
   cacheState: boolean;
 }
@@ -18,6 +21,7 @@ interface LocChanges {
 
 interface HydratedPrData {
   prUrl: string;
+  branchSummary?: string | null;
   commitCount?: number | null;
   filesChanged?: number | null;
   locChanges?: LocChanges | null;
@@ -39,6 +43,7 @@ interface LocMetricsResult {
 }
 
 interface DetailMetricsResult {
+  branchSummary: string | null;
   commitCount: number | null;
   lastActivityAt: string | null;
   detailMetricsAttemptedAt: string;
@@ -66,6 +71,7 @@ interface BaseRow {
   titleLink: HTMLAnchorElement;
   metaNode: HTMLElement | null;
   insertionPoint: Element;
+  usesStackedMetadata: boolean;
   prUrl: string;
   number: string | null;
   isDraft: boolean;

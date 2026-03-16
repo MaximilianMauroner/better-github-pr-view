@@ -19,18 +19,23 @@
 
   const DEFAULT_SETTINGS: Settings = {
     prListEnrichment: true,
-    commitCount: false,
+    branchSummary: true,
+    commitCount: true,
     filesChanged: false,
     locChanges: true,
     lastEditedTime: true,
+    autoRefreshAfterHours: 6,
     nativePrNumber: true,
     nativeOpenedTime: true,
     nativeAuthor: true,
+    nativeDraft: true,
     nativeTasks: true,
     cacheState: false
   };
 
   const SELECTORS = {
+    modernListRoot: '[data-testid="list-view"]',
+    classicListRoot: ".js-navigation-container",
     modernRows: '[data-testid="list-view"] li[class*="ListItem-module__listItem"]',
     classicRows: 'div[id^="issue_"].js-issue-row',
     modernTitleLink: '[data-testid="issue-pr-title-link"]',
@@ -41,9 +46,13 @@
 
   const MAX_CONCURRENT_FETCHES = 4;
   const HYDRATION_ROOT_MARGIN_PX = 320;
-  const CACHE_VERSION = 9;
+  const CACHE_VERSION = 11;
   const FRESH_CACHE_MS = 5 * 60 * 1000;
-  const HARD_STALE_MS = 30 * 60 * 1000;
+  const DEFAULT_AUTO_REFRESH_AFTER_HOURS = 6;
+  const MIN_AUTO_REFRESH_AFTER_HOURS = 0.5;
+  const MAX_AUTO_REFRESH_AFTER_HOURS = 168;
+  const BRANCH_SUMMARY_OWNER_PREFIX_LENGTH = 6;
+  const VERBOSE_BRANCH_SUMMARY_LENGTH = 26;
   const AUTO_REFRESH_COOLDOWN_MS = 2 * 60 * 1000;
   const AUTO_REFRESH_ERROR_COOLDOWN_MS = 5 * 60 * 1000;
   const MANAGED_NATIVE_META_ATTR = "data-bgpv-managed-native-meta";
@@ -56,6 +65,7 @@
   let currentPageKey = "";
   let renderEpoch = 0;
   let intersectionObserver: IntersectionObserver | null = null;
+  let mutationObserver: MutationObserver | null = null;
   let observedRows = new WeakSet<Element>();
   let activeFetches = 0;
   const fetchQueue: FetchQueueItem<LocMetricsResult | DetailMetricsResult | FilesChangedMetricsResult | null>[] = [];
@@ -112,7 +122,7 @@
       return false;
     }
 
-    if ((settings.lastEditedTime || settings.commitCount) && !data.detailMetricsAttemptedAt) {
+    if ((settings.lastEditedTime || settings.commitCount || settings.branchSummary) && !data.detailMetricsAttemptedAt) {
       return false;
     }
 
@@ -169,13 +179,25 @@
     return Math.max(0, Date.now() - timestamp);
   }
 
+  function sanitizeAutoRefreshAfterHours(value: unknown): number {
+    if (typeof value !== "number" || !Number.isFinite(value)) {
+      return DEFAULT_AUTO_REFRESH_AFTER_HOURS;
+    }
+
+    return Math.min(MAX_AUTO_REFRESH_AFTER_HOURS, Math.max(MIN_AUTO_REFRESH_AFTER_HOURS, value));
+  }
+
+  function getAutoRefreshThresholdMs(): number {
+    return sanitizeAutoRefreshAfterHours(settings.autoRefreshAfterHours) * 60 * 60 * 1000;
+  }
+
   function getFreshnessState(data: HydratedPrData | null): FreshnessState {
     const ageMs = getFreshnessAgeMs(data);
     if (ageMs <= FRESH_CACHE_MS) {
       return "fresh";
     }
 
-    if (ageMs <= HARD_STALE_MS) {
+    if (ageMs <= getAutoRefreshThresholdMs()) {
       return "soft_stale";
     }
 
@@ -199,7 +221,7 @@
   }
 
   function shouldFetchDetailMetrics(data: HydratedPrData | null, forceRefresh: boolean): boolean {
-    if (!settings.lastEditedTime && !settings.commitCount) {
+    if (!settings.lastEditedTime && !settings.commitCount && !settings.branchSummary) {
       return false;
     }
 
@@ -235,7 +257,7 @@
       return true;
     }
 
-    if (getFreshnessState(cacheEntry.data) === "fresh") {
+    if (getFreshnessAgeMs(cacheEntry.data) < getAutoRefreshThresholdMs()) {
       return true;
     }
 
@@ -261,6 +283,12 @@
       const titleLink = getTitleLink(row);
       return titleLink?.getAttribute("href")?.includes("/pull/");
     });
+  }
+
+  function getBaseRows(): BaseRow[] {
+    return getRows()
+      .map(parseBaseRow)
+      .filter((baseRow): baseRow is BaseRow => Boolean(baseRow));
   }
 
   function getTitleLink(row: ParentNode): HTMLAnchorElement | null {
@@ -297,12 +325,14 @@
     const numberMatch = href.match(/\/pull\/(\d+)(?:$|[?#/])/);
     const metaNode = getNativeMetaNode(row);
     const insertionPoint = metaNode?.parentElement || titleLink.closest("div") || row;
+    const usesStackedMetadata = row.matches(SELECTORS.modernRows);
 
     return {
       row,
       titleLink,
       metaNode,
       insertionPoint,
+      usesStackedMetadata,
       prUrl,
       number: numberMatch ? numberMatch[1] : null,
       isDraft: isDraftRow(row, metaNode)
@@ -310,7 +340,7 @@
   }
 
   function removeInjectedMetadata(target: ParentNode = document): void {
-    target.querySelectorAll(".bgpv-inline-meta").forEach((node) => node.remove());
+    target.querySelectorAll(".bgpv-inline-meta, .bgpv-branch-summary").forEach((node) => node.remove());
   }
 
   function buildNativeMetaSegments(baseRow: BaseRow, snapshot: NativeMetaSnapshot): Node[] {
@@ -380,6 +410,13 @@
     target.querySelectorAll<HTMLElement>("tracked-issues-progress").forEach((node) => {
       node.hidden = false;
     });
+
+    target.querySelectorAll<HTMLAnchorElement>('a[href*="#partial-pull-merging"]').forEach((node) => {
+      const container = node.closest<HTMLElement>("span");
+      if (container) {
+        container.hidden = false;
+      }
+    });
   }
 
   function applyNativeMetaSettings(baseRow: BaseRow): void {
@@ -399,6 +436,15 @@
     snapshot.node.hidden = segments.length === 0;
   }
 
+  function applyNativeDraftSettings(baseRow: BaseRow): void {
+    baseRow.row.querySelectorAll<HTMLAnchorElement>('a[href*="#partial-pull-merging"]').forEach((node) => {
+      const container = node.closest<HTMLElement>("span");
+      if (container) {
+        container.hidden = !settings.nativeDraft;
+      }
+    });
+  }
+
   function applyNativeTaskSettings(baseRow: BaseRow): void {
     const taskProgressNode = baseRow.row.querySelector<HTMLElement>("tracked-issues-progress");
     if (!taskProgressNode) {
@@ -410,17 +456,21 @@
 
   function applyNativeRowSettings(baseRow: BaseRow): void {
     applyNativeMetaSettings(baseRow);
+    applyNativeDraftSettings(baseRow);
     applyNativeTaskSettings(baseRow);
   }
 
   function removeRowMetadata(row: Element): void {
     row.querySelector(".bgpv-inline-meta")?.remove();
+    row.querySelector(".bgpv-branch-summary")?.remove();
   }
 
   function isManagedMetaElement(node: Node | null): boolean {
     return node instanceof Element && (
       node.classList.contains("bgpv-inline-meta") ||
       Boolean(node.closest(".bgpv-inline-meta")) ||
+      node.classList.contains("bgpv-branch-summary") ||
+      Boolean(node.closest(".bgpv-branch-summary")) ||
       node.getAttribute(MANAGED_NATIVE_META_ATTR) === "true" ||
       Boolean(node.closest(`[${MANAGED_NATIVE_META_ATTR}="true"]`))
     );
@@ -449,6 +499,7 @@
       intersectionObserver.disconnect();
       intersectionObserver = null;
     }
+    mutationObserver?.disconnect();
     observedRows = new WeakSet();
     hydrationCache.clear();
     nativeMetaCache.clear();
@@ -470,10 +521,10 @@
     });
   }
 
-  function observeRows() {
+  function observeRows(baseRows: BaseRow[]) {
     createObserver();
 
-    getRows().forEach((row) => {
+    baseRows.forEach(({ row }) => {
       if (observedRows.has(row)) {
         return;
       }
@@ -490,6 +541,59 @@
       }
 
       hydrateVisibleRow(entry.target);
+    });
+  }
+
+  function ensureMutationObserver() {
+    if (mutationObserver) {
+      return;
+    }
+
+    mutationObserver = new MutationObserver((mutations) => {
+      if (shouldIgnoreMutations(mutations)) {
+        return;
+      }
+
+      scheduleRefresh();
+    });
+  }
+
+  function getMutationTargets(baseRows: BaseRow[]): Element[] {
+    const selectorTargets = [
+      ...Array.from(document.querySelectorAll(SELECTORS.modernListRoot)),
+      ...Array.from(document.querySelectorAll(SELECTORS.classicListRoot))
+    ];
+
+    if (selectorTargets.length > 0) {
+      return Array.from(new Set(selectorTargets));
+    }
+
+    return Array.from(new Set(
+      baseRows
+        .map(({ row }) => row.parentElement)
+        .filter((element): element is HTMLElement => Boolean(element))
+    ));
+  }
+
+  function syncMutationObserver(baseRows: BaseRow[]): void {
+    if (!isPullListPage() || !settings.prListEnrichment) {
+      mutationObserver?.disconnect();
+      return;
+    }
+
+    const targets = getMutationTargets(baseRows);
+    if (targets.length === 0) {
+      mutationObserver?.disconnect();
+      return;
+    }
+
+    ensureMutationObserver();
+    mutationObserver?.disconnect();
+    targets.forEach((target) => {
+      mutationObserver?.observe(target, {
+        childList: true,
+        subtree: true
+      });
     });
   }
 
@@ -591,10 +695,29 @@
     return null;
   }
 
-  function extractEmbeddedCommitCount(detailDocument: Document): number | null {
+  function shortenBranchOwner(owner: string): string {
+    if (owner.length <= BRANCH_SUMMARY_OWNER_PREFIX_LENGTH) {
+      return owner;
+    }
+
+    return owner.slice(0, BRANCH_SUMMARY_OWNER_PREFIX_LENGTH);
+  }
+
+  function formatBranchSummary(headOwner: string, headBranch: string, baseOwner: string, baseBranch: string): string {
+    if (headOwner === baseOwner) {
+      return `${headBranch} → ${baseBranch}`;
+    }
+
+    return `${shortenBranchOwner(headOwner)}:${headBranch} → ${baseBranch}`;
+  }
+
+  function extractEmbeddedDetailMetrics(detailDocument: Document): Pick<DetailMetricsResult, "branchSummary" | "commitCount"> {
     const embeddedDataNode = detailDocument.querySelector<HTMLScriptElement>('script[data-target="react-app.embeddedData"]');
     if (!embeddedDataNode?.textContent) {
-      return null;
+      return {
+        branchSummary: null,
+        commitCount: null
+      };
     }
 
     try {
@@ -603,34 +726,55 @@
           pullRequestsLayoutRoute?: {
             pullRequest?: {
               commitsCount?: number;
+              baseBranch?: string;
+              headBranch?: string;
+              headRepositoryOwnerLogin?: string;
+            };
+            repository?: {
+              ownerLogin?: string;
             };
           };
         };
       };
 
-      const commitCount = embeddedData?.payload?.pullRequestsLayoutRoute?.pullRequest?.commitsCount;
-      return typeof commitCount === "number" ? commitCount : null;
+      const pullRequest = embeddedData?.payload?.pullRequestsLayoutRoute?.pullRequest;
+      const repository = embeddedData?.payload?.pullRequestsLayoutRoute?.repository;
+      const branchSummary = typeof pullRequest?.headRepositoryOwnerLogin === "string"
+        && typeof pullRequest?.headBranch === "string"
+        && typeof repository?.ownerLogin === "string"
+        && typeof pullRequest?.baseBranch === "string"
+        ? formatBranchSummary(
+          pullRequest.headRepositoryOwnerLogin,
+          pullRequest.headBranch,
+          repository.ownerLogin,
+          pullRequest.baseBranch
+        )
+        : null;
+      const commitCount = typeof pullRequest?.commitsCount === "number" ? pullRequest.commitsCount : null;
+
+      return {
+        branchSummary,
+        commitCount
+      };
     } catch {
-      return null;
+      return {
+        branchSummary: null,
+        commitCount: null
+      };
     }
-  }
-
-  function extractCommitCount(detailDocument: Document): number | null {
-    const embeddedCommitCount = extractEmbeddedCommitCount(detailDocument);
-    if (embeddedCommitCount !== null) {
-      return embeddedCommitCount;
-    }
-
-    const counterNode = detailDocument.querySelector<HTMLElement>(
-      "#prs-commits-anchor-tab .prc-CounterLabel-CounterLabel-X-kRU, #commits_tab_counter, a[href*='/pull/'][href$='/commits'] .Counter"
-    );
-
-    return parseCountValue(counterNode?.getAttribute("title") || counterNode?.textContent);
   }
 
   function extractFilesChangedCount(filesDocument: Document): number | null {
     const counterNode = filesDocument.querySelector<HTMLElement>(
       "#files_tab_counter, #prs-files-anchor-tab .prc-CounterLabel-CounterLabel-X-kRU, a[href*='/pull/'][href$='/files'] .Counter"
+    );
+
+    return parseCountValue(counterNode?.getAttribute("title") || counterNode?.textContent);
+  }
+
+  function extractCommitCountFallback(detailDocument: Document): number | null {
+    const counterNode = detailDocument.querySelector<HTMLElement>(
+      "#prs-commits-anchor-tab .prc-CounterLabel-CounterLabel-X-kRU, #commits_tab_counter, a[href*='/pull/'][href$='/commits'] .Counter"
     );
 
     return parseCountValue(counterNode?.getAttribute("title") || counterNode?.textContent);
@@ -672,16 +816,20 @@
   }
 
   async function fetchDetailMetrics(prUrl: string): Promise<DetailMetricsResult> {
+    let branchSummary = null;
     let commitCount = null;
     let lastActivityAt = null;
 
     try {
       const detailDocument = await fetchDocument(prUrl);
-      commitCount = extractCommitCount(detailDocument);
+      const embeddedDetailMetrics = extractEmbeddedDetailMetrics(detailDocument);
+      branchSummary = embeddedDetailMetrics.branchSummary;
+      commitCount = embeddedDetailMetrics.commitCount ?? extractCommitCountFallback(detailDocument);
       lastActivityAt = extractLastEditedAt(detailDocument);
     } catch {}
 
     return {
+      branchSummary,
       commitCount,
       lastActivityAt,
       detailMetricsAttemptedAt: new Date().toISOString()
@@ -712,11 +860,7 @@
     };
   }
 
-  async function warmPersistentCache(rows: Element[]): Promise<void> {
-    const baseRows = rows
-      .map(parseBaseRow)
-      .filter((baseRow): baseRow is BaseRow => Boolean(baseRow));
-
+  async function warmPersistentCache(baseRows: BaseRow[]): Promise<void> {
     const missing = baseRows
       .filter((baseRow) => !ensureCacheEntry(baseRow.prUrl).loadedFromStorage)
       .map((baseRow) => baseRow.prUrl);
@@ -807,6 +951,7 @@
       if (detailData) {
         nextData = {
           ...nextData,
+          branchSummary: detailData.branchSummary ?? nextData.branchSummary ?? null,
           commitCount: detailData.commitCount ?? nextData.commitCount ?? null,
           lastActivityAt: detailData.lastActivityAt ?? nextData.lastActivityAt ?? null,
           detailMetricsAttemptedAt: detailData.detailMetricsAttemptedAt ?? nextData.detailMetricsAttemptedAt ?? null
@@ -871,6 +1016,31 @@
   function createCountItem(count: number, singularLabel: string, pluralLabel: string): HTMLSpanElement {
     const label = count === 1 ? singularLabel : pluralLabel;
     return createMetaItem(`${count} ${label}`);
+  }
+
+  function createBranchSummaryElement(summary: string): HTMLDivElement {
+    const item = document.createElement("div");
+    item.className = "bgpv-branch-summary";
+    item.title = summary;
+
+    const [sourceBranch, targetBranch] = summary.includes(" → ")
+      ? summary.split(" → ", 2)
+      : summary.split(" -> ", 2);
+
+    const source = document.createElement("span");
+    source.className = "bgpv-branch-summary__source";
+    source.textContent = sourceBranch || summary;
+
+    const arrow = document.createElement("span");
+    arrow.className = "bgpv-branch-summary__arrow";
+    arrow.textContent = "→";
+
+    const target = document.createElement("span");
+    target.className = "bgpv-branch-summary__target";
+    target.textContent = targetBranch || "";
+
+    item.append(source, arrow, target);
+    return item;
   }
 
   function getFreshnessDescriptor(
@@ -960,19 +1130,52 @@
     return items;
   }
 
+  function shouldStackMetadata(baseRow: BaseRow, items: HTMLElement[]): boolean {
+    if (!baseRow.usesStackedMetadata) {
+      return false;
+    }
+
+    if (items.length >= 4) {
+      return true;
+    }
+
+    return items.length >= 3 && hasVerboseBranchSummary(items);
+  }
+
+  function hasVerboseBranchSummary(items: HTMLElement[]): boolean {
+    return items.some((item) => normalizeWhitespace(item.textContent || "").length >= VERBOSE_BRANCH_SUMMARY_LENGTH);
+  }
+
   function renderRowMetadata(baseRow: BaseRow, hydratedData: HydratedPrData): void {
     removeRowMetadata(baseRow.row);
     applyNativeRowSettings(baseRow);
 
     const cacheEntry = ensureCacheEntry(baseRow.prUrl);
     const items = buildMetadataItems(baseRow, hydratedData, cacheEntry);
+    const branchSummary = settings.branchSummary && hydratedData.branchSummary
+      ? createBranchSummaryElement(hydratedData.branchSummary)
+      : null;
+
+    if (branchSummary && baseRow.insertionPoint.parentElement) {
+      baseRow.insertionPoint.insertAdjacentElement("beforebegin", branchSummary);
+    }
+
     if (items.length === 0) {
       return;
     }
 
-    const container = document.createElement("span");
+    const container = document.createElement(baseRow.usesStackedMetadata ? "div" : "span");
     container.className = "bgpv-inline-meta";
+    if (shouldStackMetadata(baseRow, items)) {
+      container.classList.add("bgpv-inline-meta--stacked");
+    }
     items.forEach((item) => container.appendChild(item));
+
+    const stackedAnchor = baseRow.metaNode || baseRow.insertionPoint;
+    if (container.classList.contains("bgpv-inline-meta--stacked") && stackedAnchor.parentElement) {
+      stackedAnchor.insertAdjacentElement("afterend", container);
+      return;
+    }
 
     baseRow.insertionPoint.appendChild(container);
   }
@@ -1093,16 +1296,14 @@
     }
 
     document.body.classList.add("bgpv-pr-list-active");
-    const rows = getRows();
-    warmPersistentCache(rows)
+    const initialBaseRows = getBaseRows();
+    syncMutationObserver(initialBaseRows);
+
+    warmPersistentCache(initialBaseRows)
       .catch(() => {})
       .finally(() => {
-        rows.forEach((row) => {
-          const baseRow = parseBaseRow(row);
-          if (!baseRow) {
-            return;
-          }
-
+        const baseRows = getBaseRows();
+        baseRows.forEach((baseRow) => {
           applyNativeRowSettings(baseRow);
           const cacheEntry = ensureCacheEntry(baseRow.prUrl);
           if (cacheEntry.data) {
@@ -1110,10 +1311,11 @@
             return;
           }
 
-          removeRowMetadata(row);
+          removeRowMetadata(baseRow.row);
         });
 
-        observeRows();
+        observeRows(baseRows);
+        syncMutationObserver(baseRows);
       });
   }
 
@@ -1130,25 +1332,19 @@
   }
 
   function installObservers(): void {
-    const mutationObserver = new MutationObserver((mutations) => {
-      if (shouldIgnoreMutations(mutations)) {
-        return;
-      }
-
-      scheduleRefresh();
-    });
-    mutationObserver.observe(document.documentElement, {
-      childList: true,
-      subtree: true
-    });
-
     document.addEventListener("turbo:load", scheduleRefresh);
     document.addEventListener("pjax:end", scheduleRefresh);
     window.addEventListener("popstate", scheduleRefresh);
   }
 
   chrome.storage.sync.get({ bgpvSettings: DEFAULT_SETTINGS }, (result) => {
-    settings = { ...DEFAULT_SETTINGS, ...(result.bgpvSettings as Partial<Settings> | undefined) };
+    settings = {
+      ...DEFAULT_SETTINGS,
+      ...(result.bgpvSettings as Partial<Settings> | undefined),
+      autoRefreshAfterHours: sanitizeAutoRefreshAfterHours(
+        (result.bgpvSettings as Partial<Settings> | undefined)?.autoRefreshAfterHours
+      )
+    };
     refresh();
     installObservers();
   });
@@ -1157,7 +1353,10 @@
     if (areaName === "sync" && changes.bgpvSettings) {
       settings = {
         ...DEFAULT_SETTINGS,
-        ...((changes.bgpvSettings.newValue as Partial<Settings> | undefined) ?? {})
+        ...((changes.bgpvSettings.newValue as Partial<Settings> | undefined) ?? {}),
+        autoRefreshAfterHours: sanitizeAutoRefreshAfterHours(
+          (changes.bgpvSettings.newValue as Partial<Settings> | undefined)?.autoRefreshAfterHours
+        )
       };
       scheduleRefresh();
       return;

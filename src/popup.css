@@ -16,17 +16,19 @@
   box-sizing: border-box;
 }
 
+html,
 body {
   margin: 0;
-  min-width: 320px;
+  width: 360px;
+  min-width: 360px;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
   background: var(--bg);
   color: var(--text);
 }
 
 .popup-shell {
-  width: 320px;
-  padding: 16px;
+  width: 100%;
+  padding: clamp(14px, 4vw, 16px);
   background: var(--bg);
 }
 
@@ -59,6 +61,7 @@ body {
   gap: 12px;
   align-items: center;
   padding: 12px;
+  min-height: 48px;
   border: 1px solid var(--border-strong);
   border-radius: 8px;
   background: var(--panel);
@@ -136,8 +139,24 @@ body {
   border-radius: 8px;
   background: rgba(110, 118, 129, 0.08);
   color: var(--muted);
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.5;
+}
+
+.settings-note__title {
+  margin: 0 0 6px;
+  color: var(--text-strong);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.settings-note__list {
+  margin: 0;
+  padding-left: 16px;
+}
+
+.settings-note__list li + li {
+  margin-top: 4px;
 }
 
 .settings-note strong {
@@ -146,6 +165,7 @@ body {
 }
 
 .settings-pane.is-disabled .compact-toggle,
+.settings-pane.is-disabled .settings-select,
 .settings-pane.is-disabled .settings-note {
   border-color: var(--border);
   background: var(--panel-muted);
@@ -157,6 +177,7 @@ body {
   gap: 12px;
   align-items: center;
   padding: 10px 12px;
+  min-height: 44px;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--panel-muted);
@@ -164,8 +185,35 @@ body {
   color: var(--text-strong);
 }
 
+.settings-select {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel-muted);
+}
+
+.settings-select__copy {
+  display: grid;
+  gap: 4px;
+}
+
+.settings-select__title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+
+.settings-select__description {
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+
 .master-toggle:has(input:focus-visible),
-.compact-toggle:has(input:focus-visible) {
+.compact-toggle:has(input:focus-visible),
+.settings-select:has(select:focus-visible) {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
@@ -200,8 +248,8 @@ body {
 
 input[type="checkbox"] {
   appearance: none;
-  width: 36px;
-  height: 20px;
+  width: 44px;
+  height: 28px;
   border-radius: 999px;
   border: 1px solid var(--border-strong);
   background: var(--toggle-off);
@@ -214,10 +262,10 @@ input[type="checkbox"] {
 input[type="checkbox"]::after {
   content: "";
   position: absolute;
-  top: 1px;
-  left: 1px;
-  width: 16px;
-  height: 16px;
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
   border-radius: 50%;
   background: #f0f6fc;
   transition: transform 160ms ease;
@@ -241,6 +289,32 @@ input[type="checkbox"]:disabled {
   cursor: not-allowed;
 }
 
+select {
+  appearance: none;
+  width: 100%;
+  min-height: 40px;
+  padding: 10px 36px 10px 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  background:
+    linear-gradient(45deg, transparent 50%, var(--muted) 50%) calc(100% - 18px) calc(50% - 2px) / 6px 6px no-repeat,
+    linear-gradient(135deg, var(--muted) 50%, transparent 50%) calc(100% - 13px) calc(50% - 2px) / 6px 6px no-repeat,
+    var(--panel);
+  color: var(--text-strong);
+  font: inherit;
+  cursor: pointer;
+}
+
+select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+select:disabled {
+  cursor: not-allowed;
+  color: var(--muted);
+}
+
 .popup-footer {
   margin-top: 16px;
   padding-top: 12px;
@@ -254,10 +328,20 @@ input[type="checkbox"]:disabled {
   margin: 0;
 }
 
+.popup-footer-link {
+  color: var(--text);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.popup-footer-link:hover {
+  color: var(--text-strong);
+}
+
 .popup-actions {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  justify-content: space-between;
   gap: 12px;
   margin-top: 12px;
 }
@@ -272,7 +356,8 @@ input[type="checkbox"]:disabled {
   font-size: 12px;
   font-weight: 600;
   line-height: 1;
-  padding: 8px 10px;
+  min-height: 44px;
+  padding: 10px 12px;
   cursor: pointer;
 }
 
@@ -298,8 +383,40 @@ input[type="checkbox"]:disabled {
   text-align: right;
 }
 
+.popup-footnote {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
 code {
   font-family: ui-monospace, SFMono-Regular, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--text);
+}
+
+@media (max-width: 340px) {
+  .master-toggle,
+  .compact-toggle {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 10px;
+  }
+
+  .popup-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .popup-status {
+    text-align: left;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .settings-pane,
+  input[type="checkbox"],
+  input[type="checkbox"]::after,
+  .popup-button {
+    transition: none;
+  }
 }
