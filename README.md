@@ -3,6 +3,7 @@
 A Manifest V3 browser extension that adds a compact metadata strip to GitHub repository pull request list rows.
 
 ![Example pull request list enriched by the extension](./assets/store/image.png)
+
 ![Example pull request list un-enriched by the extension](./assets/store/image-2.png)
 
 It is narrowly scoped: on repository `Pull requests` pages, it augments each visible row with information that normally requires opening the PR first.
