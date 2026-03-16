@@ -3,6 +3,13 @@
   "name": "Better GitHub PR View",
   "description": "Improve the structure and scanability of GitHub Issues and Pull Requests pages.",
   "version": "0.1.0",
+  "icons": {
+    "16": "assets/extension-icons/icon-16.png",
+    "32": "assets/extension-icons/icon-32.png",
+    "48": "assets/extension-icons/icon-48.png",
+    "96": "assets/extension-icons/icon-96.png",
+    "128": "assets/extension-icons/icon-128.png"
+  },
   "permissions": [
     "storage"
   ],
@@ -10,6 +17,11 @@
     "https://github.com/*"
   ],
   "action": {
+    "default_icon": {
+      "16": "assets/extension-icons/icon-16.png",
+      "32": "assets/extension-icons/icon-32.png",
+      "48": "assets/extension-icons/icon-48.png"
+    },
     "default_title": "Better GitHub PR View",
     "default_popup": "popup.html"
   },

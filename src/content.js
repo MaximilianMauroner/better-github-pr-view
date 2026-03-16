@@ -295,7 +295,7 @@
     const metaNode = baseRow.metaNode;
     snapshot = {
       node: metaNode,
-      originalHTML: metaNode.innerHTML,
+      originalNodes: Array.from(metaNode.childNodes, (node) => node.cloneNode(true)),
       numberText: baseRow.number ? `#${baseRow.number}` : (normalizeWhitespace(metaNode.textContent || "").match(/#\d+/)?.[0] || null),
       timeNode: metaNode.querySelector("relative-time"),
       authorNode: metaNode.querySelector("a.Link--muted, a[data-hovercard-type='user'], a[title]")
@@ -312,7 +312,7 @@
       }
 
       snapshot.node.hidden = false;
-      snapshot.node.innerHTML = snapshot.originalHTML;
+      snapshot.node.replaceChildren(...snapshot.originalNodes.map((node) => node.cloneNode(true)));
     });
 
     target.querySelectorAll("tracked-issues-progress").forEach((node) => {
@@ -328,7 +328,7 @@
 
     if (settings.nativePrNumber && settings.nativeOpenedTime && settings.nativeAuthor) {
       snapshot.node.hidden = false;
-      snapshot.node.innerHTML = snapshot.originalHTML;
+      snapshot.node.replaceChildren(...snapshot.originalNodes.map((node) => node.cloneNode(true)));
       return;
     }
 

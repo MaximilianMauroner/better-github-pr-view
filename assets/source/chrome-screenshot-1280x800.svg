@@ -1,0 +1,20 @@
+<svg width="1280" height="800" viewBox="0 0 1280 800" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1280" height="800" fill="#0D1117"/>
+  <rect x="44" y="40" width="1192" height="720" rx="24" fill="#161B22" stroke="#30363D" stroke-width="2"/>
+  <text x="88" y="110" fill="#F0F6FC" font-size="44" font-family="Helvetica, Arial, sans-serif" font-weight="700">Better GitHub PR View</text>
+  <text x="88" y="156" fill="#8B949E" font-size="24" font-family="Helvetica, Arial, sans-serif">Replace this placeholder with a real product screenshot before store submission.</text>
+  <rect x="88" y="212" width="1104" height="474" rx="20" fill="#0D1117" stroke="#30363D" stroke-width="2"/>
+  <rect x="126" y="256" width="420" height="18" rx="9" fill="#8B949E"/>
+  <rect x="126" y="304" width="228" height="14" rx="7" fill="#2EA043"/>
+  <rect x="126" y="338" width="310" height="14" rx="7" fill="#58A6FF"/>
+  <rect x="126" y="372" width="254" height="14" rx="7" fill="#D29922"/>
+  <rect x="126" y="452" width="420" height="18" rx="9" fill="#8B949E"/>
+  <rect x="126" y="500" width="228" height="14" rx="7" fill="#2EA043"/>
+  <rect x="126" y="534" width="310" height="14" rx="7" fill="#58A6FF"/>
+  <rect x="126" y="568" width="254" height="14" rx="7" fill="#D29922"/>
+  <rect x="740" y="264" width="382" height="338" rx="18" fill="#161B22" stroke="#30363D" stroke-width="2"/>
+  <text x="774" y="316" fill="#F0F6FC" font-size="24" font-family="Helvetica, Arial, sans-serif" font-weight="700">Popup controls</text>
+  <rect x="774" y="352" width="314" height="56" rx="14" fill="#0D1117" stroke="#30363D" stroke-width="2"/>
+  <rect x="774" y="428" width="314" height="56" rx="14" fill="#0D1117" stroke="#30363D" stroke-width="2"/>
+  <rect x="774" y="504" width="314" height="56" rx="14" fill="#0D1117" stroke="#30363D" stroke-width="2"/>
+</svg>

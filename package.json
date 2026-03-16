@@ -1,0 +1,19 @@
+{
+  "name": "better-github-pr-view",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Release tooling and store metadata for Better GitHub PR View.",
+  "type": "module",
+  "scripts": {
+    "assets:generate": "node scripts/generate-assets.mjs",
+    "build:chrome": "node scripts/build.mjs chrome",
+    "build:firefox": "node scripts/build.mjs firefox",
+    "pack:chrome": "npm run build:chrome && node scripts/pack.mjs chrome",
+    "pack:firefox": "npm run build:firefox && node scripts/pack.mjs firefox",
+    "lint:firefox": "npm run build:firefox && web-ext lint -s dist/firefox",
+    "check:release": "npm run build:chrome && npm run build:firefox && npm run lint:firefox && node scripts/check-release.mjs && npm run pack:chrome && npm run pack:firefox"
+  },
+  "devDependencies": {
+    "web-ext": "^8.9.0"
+  }
+}
