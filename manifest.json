@@ -1,0 +1,30 @@
+{
+  "manifest_version": 3,
+  "name": "Better GitHub PR View",
+  "description": "Improve the structure and scanability of GitHub Issues and Pull Requests pages.",
+  "version": "0.1.0",
+  "permissions": [
+    "storage"
+  ],
+  "host_permissions": [
+    "https://github.com/*"
+  ],
+  "action": {
+    "default_title": "Better GitHub PR View",
+    "default_popup": "popup.html"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://github.com/*"
+      ],
+      "js": [
+        "src/content.js"
+      ],
+      "css": [
+        "src/content.css"
+      ],
+      "run_at": "document_idle"
+    }
+  ]
+}

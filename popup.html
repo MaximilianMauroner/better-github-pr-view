@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Better GitHub PR View</title>
+    <link rel="stylesheet" href="src/popup.css">
+  </head>
+  <body>
+    <main class="popup-shell">
+      <header class="popup-header">
+        <h1>Better GitHub PR View</h1>
+        <p class="intro">
+          Native-feeling PR list controls for GitHub.
+        </p>
+      </header>
+
+      <section class="master-section" aria-label="Extension power">
+        <label class="master-toggle" for="prListEnrichment">
+          <span class="master-toggle__copy">
+            <span class="master-toggle__eyebrow">Extension</span>
+            <span class="master-toggle__title">PR list enrichment</span>
+            <span class="master-toggle__description">Turn the extension on or off for GitHub pull request lists.</span>
+          </span>
+          <input id="prListEnrichment" name="prListEnrichment" type="checkbox">
+        </label>
+      </section>
+
+      <div id="settingsPane" class="settings-pane">
+        <section class="settings-group" aria-label="Injected metadata">
+          <div class="settings-group__header">
+            <h2>Injected metadata</h2>
+            <p>Choose exactly which extension-added row items stay visible.</p>
+          </div>
+
+          <div class="compact-settings" aria-label="Extension settings">
+            <label class="compact-toggle" for="locChanges">
+              <span>LOC changes</span>
+              <input id="locChanges" name="locChanges" type="checkbox">
+            </label>
+
+            <label class="compact-toggle" for="lastEditedTime">
+              <span>Last edited</span>
+              <input id="lastEditedTime" name="lastEditedTime" type="checkbox">
+            </label>
+
+            <label class="compact-toggle" for="cacheState">
+              <span>Cache freshness</span>
+              <input id="cacheState" name="cacheState" type="checkbox">
+            </label>
+          </div>
+        </section>
+
+        <section class="settings-group" aria-label="Native row metadata">
+          <div class="settings-group__header">
+            <h2>GitHub row metadata</h2>
+            <p>Choose which native GitHub pieces stay visible in the opened-by line.</p>
+          </div>
+
+          <div class="compact-settings">
+            <label class="compact-toggle" for="nativePrNumber">
+              <span>PR number</span>
+              <input id="nativePrNumber" name="nativePrNumber" type="checkbox">
+            </label>
+
+            <label class="compact-toggle" for="nativeOpenedTime">
+              <span>Opened time</span>
+              <input id="nativeOpenedTime" name="nativeOpenedTime" type="checkbox">
+            </label>
+
+            <label class="compact-toggle" for="nativeAuthor">
+              <span>Author</span>
+              <input id="nativeAuthor" name="nativeAuthor" type="checkbox">
+            </label>
+
+            <label class="compact-toggle" for="nativeTasks">
+              <span>Task progress</span>
+              <input id="nativeTasks" name="nativeTasks" type="checkbox">
+            </label>
+          </div>
+        </section>
+      </div>
+
+      <footer class="popup-footer">
+        <p class="popup-footer-copy">
+          Works on repository-level <code>/pulls</code> pages on <code>github.com</code>.
+        </p>
+        <div class="popup-actions">
+          <button id="clearCache" class="popup-button" type="button">Clear cache</button>
+          <span id="cacheStatus" class="popup-status" aria-live="polite"></span>
+        </div>
+      </footer>
+    </main>
+
+    <script src="src/popup.js"></script>
+  </body>
+</html>
