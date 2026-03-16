@@ -84,11 +84,11 @@ body {
 .settings-pane {
   display: grid;
   gap: 16px;
-  transition: opacity 160ms ease;
+  transition: color 160ms ease, border-color 160ms ease, background 160ms ease;
 }
 
 .settings-pane.is-disabled {
-  opacity: 0.55;
+  color: var(--text);
 }
 
 .settings-group {
@@ -129,6 +129,28 @@ body {
   gap: 8px;
 }
 
+.settings-note {
+  margin: 10px 0 0;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: rgba(110, 118, 129, 0.08);
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.settings-note strong {
+  color: var(--text-strong);
+  font-weight: 600;
+}
+
+.settings-pane.is-disabled .compact-toggle,
+.settings-pane.is-disabled .settings-note {
+  border-color: var(--border);
+  background: var(--panel-muted);
+}
+
 .compact-toggle {
   display: grid;
   grid-template-columns: 1fr auto;
@@ -140,6 +162,12 @@ body {
   background: var(--panel-muted);
   font-size: 12px;
   color: var(--text-strong);
+}
+
+.master-toggle:has(input:focus-visible),
+.compact-toggle:has(input:focus-visible) {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .toggle-card {
@@ -204,6 +232,15 @@ input[type="checkbox"]:checked::after {
   transform: translateX(16px);
 }
 
+input[type="checkbox"]:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+input[type="checkbox"]:disabled {
+  cursor: not-allowed;
+}
+
 .popup-footer {
   margin-top: 16px;
   padding-top: 12px;
@@ -242,6 +279,11 @@ input[type="checkbox"]:checked::after {
 .popup-button:hover {
   background: #1f2630;
   border-color: #6e7681;
+}
+
+.popup-button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .popup-button:disabled {

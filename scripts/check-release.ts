@@ -38,6 +38,10 @@ async function main() {
     throw new Error("Firefox build is missing the expected Gecko add-on ID.");
   }
 
+  if (firefoxManifest.browser_specific_settings?.gecko?.strict_min_version !== "142.0") {
+    throw new Error("Firefox build must target Firefox 142.0 or later to support data_collection_permissions across Firefox platforms.");
+  }
+
   const firefoxPermissions = firefoxManifest.browser_specific_settings?.gecko?.data_collection_permissions;
   if (!firefoxPermissions || firefoxPermissions.required?.join(",") !== "none") {
     throw new Error("Firefox build must declare data_collection_permissions.required = ['none'].");

@@ -6,6 +6,11 @@
     };
   }
 
+  interface TabCountsPayload {
+    filesChangedCount?: number;
+    filesChangedCountLimitExceeded?: boolean;
+  }
+
   interface FetchQueueItem<T> {
     taskFactory: () => Promise<T>;
     resolve: (value: T | PromiseLike<T>) => void;
@@ -14,6 +19,8 @@
 
   const DEFAULT_SETTINGS: Settings = {
     prListEnrichment: true,
+    commitCount: false,
+    filesChanged: false,
     locChanges: true,
     lastEditedTime: true,
     nativePrNumber: true,
@@ -51,7 +58,7 @@
   let intersectionObserver: IntersectionObserver | null = null;
   let observedRows = new WeakSet<Element>();
   let activeFetches = 0;
-  const fetchQueue: FetchQueueItem<LocMetricsResult | LastEditedMetricsResult | null>[] = [];
+  const fetchQueue: FetchQueueItem<LocMetricsResult | DetailMetricsResult | FilesChangedMetricsResult | null>[] = [];
 
   function getStorageArea(area: StorageArea): chrome.storage.StorageArea {
     return area === "local" ? chrome.storage.local : chrome.storage.sync;
@@ -67,8 +74,9 @@
       entry = {
         data: null,
         loadedFromStorage: false,
-        filesPromise: null,
+        locMetricsPromise: null,
         detailPromise: null,
+        filesChangedPromise: null,
         isRefreshing: false,
         refreshUiMode: null,
         lastAutoRefreshAt: 0,
@@ -104,7 +112,11 @@
       return false;
     }
 
-    if (settings.lastEditedTime && !data.lastActivityAttemptedAt) {
+    if ((settings.lastEditedTime || settings.commitCount) && !data.detailMetricsAttemptedAt) {
+      return false;
+    }
+
+    if (settings.filesChanged && !data.filesChangedAttemptedAt) {
       return false;
     }
 
@@ -186,8 +198,8 @@
     return false;
   }
 
-  function shouldFetchLastEdited(data: HydratedPrData | null, forceRefresh: boolean): boolean {
-    if (!settings.lastEditedTime) {
+  function shouldFetchDetailMetrics(data: HydratedPrData | null, forceRefresh: boolean): boolean {
+    if (!settings.lastEditedTime && !settings.commitCount) {
       return false;
     }
 
@@ -195,7 +207,23 @@
       return true;
     }
 
-    if (!data?.lastActivityAttemptedAt) {
+    if (!data?.detailMetricsAttemptedAt) {
+      return true;
+    }
+
+    return false;
+  }
+
+  function shouldFetchFilesChanged(data: HydratedPrData | null, forceRefresh: boolean): boolean {
+    if (!settings.filesChanged) {
+      return false;
+    }
+
+    if (forceRefresh) {
+      return true;
+    }
+
+    if (!data?.filesChangedAttemptedAt) {
       return true;
     }
 
@@ -465,11 +493,11 @@
     });
   }
 
-  function enqueueFetch<T extends LocMetricsResult | LastEditedMetricsResult | null>(
+  function enqueueFetch<T extends LocMetricsResult | DetailMetricsResult | FilesChangedMetricsResult | null>(
     taskFactory: () => Promise<T>
   ): Promise<T> {
     return new Promise((resolve, reject) => {
-      fetchQueue.push({ taskFactory, resolve, reject } as unknown as FetchQueueItem<LocMetricsResult | LastEditedMetricsResult | null>);
+      fetchQueue.push({ taskFactory, resolve, reject } as unknown as FetchQueueItem<LocMetricsResult | DetailMetricsResult | FilesChangedMetricsResult | null>);
       pumpFetchQueue();
     });
   }
@@ -542,6 +570,72 @@
     return `${value}${unit.suffix} ago`;
   }
 
+  function parseCountValue(value: string | null | undefined): number | null {
+    const normalized = normalizeWhitespace(value || "").toLowerCase();
+    if (!normalized) {
+      return null;
+    }
+
+    const suffixMatch = normalized.match(/^([\d,.]+)\s*([kmb])$/);
+    if (suffixMatch) {
+      const amount = Number.parseFloat(suffixMatch[1].replace(/,/g, ""));
+      const multiplier = suffixMatch[2] === "k" ? 1_000 : suffixMatch[2] === "m" ? 1_000_000 : 1_000_000_000;
+      return Number.isFinite(amount) ? Math.round(amount * multiplier) : null;
+    }
+
+    const digitsOnly = normalized.replace(/,/g, "");
+    if (/^\d+$/.test(digitsOnly)) {
+      return Number.parseInt(digitsOnly, 10);
+    }
+
+    return null;
+  }
+
+  function extractEmbeddedCommitCount(detailDocument: Document): number | null {
+    const embeddedDataNode = detailDocument.querySelector<HTMLScriptElement>('script[data-target="react-app.embeddedData"]');
+    if (!embeddedDataNode?.textContent) {
+      return null;
+    }
+
+    try {
+      const embeddedData = JSON.parse(embeddedDataNode.textContent) as {
+        payload?: {
+          pullRequestsLayoutRoute?: {
+            pullRequest?: {
+              commitsCount?: number;
+            };
+          };
+        };
+      };
+
+      const commitCount = embeddedData?.payload?.pullRequestsLayoutRoute?.pullRequest?.commitsCount;
+      return typeof commitCount === "number" ? commitCount : null;
+    } catch {
+      return null;
+    }
+  }
+
+  function extractCommitCount(detailDocument: Document): number | null {
+    const embeddedCommitCount = extractEmbeddedCommitCount(detailDocument);
+    if (embeddedCommitCount !== null) {
+      return embeddedCommitCount;
+    }
+
+    const counterNode = detailDocument.querySelector<HTMLElement>(
+      "#prs-commits-anchor-tab .prc-CounterLabel-CounterLabel-X-kRU, #commits_tab_counter, a[href*='/pull/'][href$='/commits'] .Counter"
+    );
+
+    return parseCountValue(counterNode?.getAttribute("title") || counterNode?.textContent);
+  }
+
+  function extractFilesChangedCount(filesDocument: Document): number | null {
+    const counterNode = filesDocument.querySelector<HTMLElement>(
+      "#files_tab_counter, #prs-files-anchor-tab .prc-CounterLabel-CounterLabel-X-kRU, a[href*='/pull/'][href$='/files'] .Counter"
+    );
+
+    return parseCountValue(counterNode?.getAttribute("title") || counterNode?.textContent);
+  }
+
   function extractLastEditedAt(detailDocument: Document): string | null {
     const timestamps = Array.from(detailDocument.querySelectorAll<HTMLElement>("relative-time[datetime]"))
       .map((node) => node.getAttribute("datetime"))
@@ -577,17 +671,44 @@
     };
   }
 
-  async function fetchLastEditedMetrics(prUrl: string): Promise<LastEditedMetricsResult> {
+  async function fetchDetailMetrics(prUrl: string): Promise<DetailMetricsResult> {
+    let commitCount = null;
     let lastActivityAt = null;
 
     try {
       const detailDocument = await fetchDocument(prUrl);
+      commitCount = extractCommitCount(detailDocument);
       lastActivityAt = extractLastEditedAt(detailDocument);
     } catch {}
 
     return {
+      commitCount,
       lastActivityAt,
-      lastActivityAttemptedAt: new Date().toISOString()
+      detailMetricsAttemptedAt: new Date().toISOString()
+    };
+  }
+
+  async function fetchFilesChangedMetrics(prUrl: string): Promise<FilesChangedMetricsResult> {
+    const baseUrl = prUrl.replace(/\/$/, "");
+    let filesChanged = null;
+
+    try {
+      const tabCountsPayload = await fetchJson<TabCountsPayload>(`${baseUrl}/page_data/tab_counts`);
+      if (typeof tabCountsPayload?.filesChangedCount === "number") {
+        filesChanged = tabCountsPayload.filesChangedCount;
+      }
+    } catch {}
+
+    if (filesChanged === null) {
+      try {
+        const filesDocument = await fetchDocument(`${baseUrl}/files`);
+        filesChanged = extractFilesChangedCount(filesDocument);
+      } catch {}
+    }
+
+    return {
+      filesChanged,
+      filesChangedAttemptedAt: new Date().toISOString()
     };
   }
 
@@ -638,14 +759,19 @@
     }
 
     const needsCodeMetrics = shouldFetchCodeMetrics(cacheEntry.data, forceRefresh);
-    const needsLastEdited = shouldFetchLastEdited(cacheEntry.data, forceRefresh);
+    const needsDetailMetrics = shouldFetchDetailMetrics(cacheEntry.data, forceRefresh);
+    const needsFilesChanged = shouldFetchFilesChanged(cacheEntry.data, forceRefresh);
 
-    if (needsCodeMetrics && !cacheEntry.filesPromise) {
-      cacheEntry.filesPromise = enqueueFetch(() => fetchLocMetrics(prUrl).catch(() => null));
+    if (needsCodeMetrics && !cacheEntry.locMetricsPromise) {
+      cacheEntry.locMetricsPromise = enqueueFetch(() => fetchLocMetrics(prUrl).catch(() => null));
     }
 
-    if (needsLastEdited && !cacheEntry.detailPromise) {
-      cacheEntry.detailPromise = enqueueFetch(() => fetchLastEditedMetrics(prUrl).catch(() => null));
+    if (needsDetailMetrics && !cacheEntry.detailPromise) {
+      cacheEntry.detailPromise = enqueueFetch(() => fetchDetailMetrics(prUrl).catch(() => null));
+    }
+
+    if (needsFilesChanged && !cacheEntry.filesChangedPromise) {
+      cacheEntry.filesChangedPromise = enqueueFetch(() => fetchFilesChangedMetrics(prUrl).catch(() => null));
     }
 
     let nextData: HydratedPrData = {
@@ -656,9 +782,9 @@
     if (needsCodeMetrics) {
       let filesData: LocMetricsResult | null;
       try {
-        filesData = await cacheEntry.filesPromise;
+        filesData = await cacheEntry.locMetricsPromise;
       } finally {
-        cacheEntry.filesPromise = null;
+        cacheEntry.locMetricsPromise = null;
       }
 
       if (filesData) {
@@ -670,8 +796,8 @@
       }
     }
 
-    if (needsLastEdited) {
-      let detailData: LastEditedMetricsResult | null;
+    if (needsDetailMetrics) {
+      let detailData: DetailMetricsResult | null;
       try {
         detailData = await cacheEntry.detailPromise;
       } finally {
@@ -681,8 +807,26 @@
       if (detailData) {
         nextData = {
           ...nextData,
+          commitCount: detailData.commitCount ?? nextData.commitCount ?? null,
           lastActivityAt: detailData.lastActivityAt ?? nextData.lastActivityAt ?? null,
-          lastActivityAttemptedAt: detailData.lastActivityAttemptedAt ?? nextData.lastActivityAttemptedAt ?? null
+          detailMetricsAttemptedAt: detailData.detailMetricsAttemptedAt ?? nextData.detailMetricsAttemptedAt ?? null
+        };
+      }
+    }
+
+    if (needsFilesChanged) {
+      let filesChangedData: FilesChangedMetricsResult | null;
+      try {
+        filesChangedData = await cacheEntry.filesChangedPromise;
+      } finally {
+        cacheEntry.filesChangedPromise = null;
+      }
+
+      if (filesChangedData) {
+        nextData = {
+          ...nextData,
+          filesChanged: filesChangedData.filesChanged ?? nextData.filesChanged ?? null,
+          filesChangedAttemptedAt: filesChangedData.filesChangedAttemptedAt ?? nextData.filesChangedAttemptedAt ?? null
         };
       }
     }
@@ -724,6 +868,11 @@
     return item;
   }
 
+  function createCountItem(count: number, singularLabel: string, pluralLabel: string): HTMLSpanElement {
+    const label = count === 1 ? singularLabel : pluralLabel;
+    return createMetaItem(`${count} ${label}`);
+  }
+
   function getFreshnessDescriptor(
     data: HydratedPrData | null,
     cacheEntry: CacheEntry
@@ -734,7 +883,7 @@
 
     if (cacheEntry.refreshUiMode === "interactive") {
       return {
-        text: "refreshing...",
+        text: "refreshing…",
         tone: "refreshing",
         freshness: getFreshnessState(data)
       };
@@ -781,6 +930,14 @@
 
   function buildMetadataItems(baseRow: BaseRow, hydratedData: HydratedPrData, cacheEntry: CacheEntry): HTMLElement[] {
     const items: HTMLElement[] = [];
+
+    if (settings.commitCount && typeof hydratedData.commitCount === "number") {
+      items.push(createCountItem(hydratedData.commitCount, "commit", "commits"));
+    }
+
+    if (settings.filesChanged && typeof hydratedData.filesChanged === "number") {
+      items.push(createCountItem(hydratedData.filesChanged, "file", "files"));
+    }
 
     if (settings.locChanges && hydratedData.locChanges) {
       items.push(createLocItem(hydratedData.locChanges));

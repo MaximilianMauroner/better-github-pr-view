@@ -33,6 +33,16 @@
           </div>
 
           <div class="compact-settings" aria-label="Extension settings">
+            <label class="compact-toggle" for="commitCount">
+              <span>Commit count</span>
+              <input id="commitCount" name="commitCount" type="checkbox">
+            </label>
+
+            <label class="compact-toggle" for="filesChanged">
+              <span>Files changed</span>
+              <input id="filesChanged" name="filesChanged" type="checkbox">
+            </label>
+
             <label class="compact-toggle" for="locChanges">
               <span>LOC changes</span>
               <input id="locChanges" name="locChanges" type="checkbox">
@@ -48,6 +58,12 @@
               <input id="cacheState" name="cacheState" type="checkbox">
             </label>
           </div>
+
+          <p class="settings-note">
+            Extra GitHub requests: <strong>Commit count</strong> and <strong>Last edited</strong> share one PR-page fetch.
+            <strong>Files changed</strong> adds one <code>/page_data/tab_counts</code> fetch. <strong>LOC changes</strong> adds one diffstat fetch.
+            <strong>Cache freshness</strong> is display-only.
+          </p>
         </section>
 
         <section class="settings-group" aria-label="Native row metadata">

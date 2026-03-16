@@ -1,6 +1,8 @@
 (function () {
   const DEFAULT_SETTINGS: Settings = {
     prListEnrichment: true,
+    commitCount: false,
+    filesChanged: false,
     locChanges: true,
     lastEditedTime: true,
     nativePrNumber: true,
@@ -75,7 +77,7 @@
 
   function clearCache(): void {
     clearCacheButtonElement.disabled = true;
-    setStatus("Clearing...");
+    setStatus("Clearing…");
 
     chrome.storage.local.get(null, (items) => {
       const cacheKeys = Object.keys(items).filter((key) => key.startsWith("bgpv:pr:"));

@@ -10,7 +10,7 @@ const sharedManifestPath = path.join(repoRoot, "manifest.json");
 const firefoxSettings = {
   gecko: {
     id: "better-github-pr-view@maximilianmauroner.github.io",
-    strict_min_version: "128.0"
+    strict_min_version: "142.0"
   }
 };
 

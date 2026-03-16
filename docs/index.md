@@ -1,6 +1,6 @@
 # Better GitHub PR View
 
-Better GitHub PR View is a Manifest V3 browser extension for desktop Chrome/Chromium and Firefox that improves the scanability of GitHub repository pull request lists.
+Better GitHub PR View is a Manifest V3 browser extension for desktop Chrome/Chromium and Firefox 142+ that improves the scanability of GitHub repository pull request lists.
 
 ## What it does
 

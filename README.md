@@ -1,17 +1,40 @@
 # Better GitHub PR View
 
-A minimal Manifest V3 browser extension that enriches GitHub repository pull request lists with native-looking metadata.
+A Manifest V3 browser extension that adds a compact metadata strip to GitHub repository pull request list rows.
 
 ![Example pull request list enriched by the extension](./assets/store/image.png)
 
-At a glance, the extension adds compact native-feeling metadata like merged or closed state, task progress, and line-change totals directly into each pull request row.
+It is narrowly scoped: on repository `Pull requests` pages, it augments each visible row with information that normally requires opening the PR first.
 
 ## What it does
 
 - Enhances repository `Pull requests` pages on `github.com`
-- Injects compact inline metadata that stays close to GitHub's native styling
+- Adds compact inline row metadata that stays close to GitHub's native styling
+- Surfaces commit count and files changed directly in the list
+- Adds line-change totals and last-edited time
+- Lets you keep or hide GitHub's native row metadata pieces like PR number, opened time, author, and task progress
 - Hydrates visible rows only, with in-memory caching and bounded fetch concurrency
-- Surfaces commit count, files changed, review state, and recent activity when detectable
+- Caches fetched PR metadata locally and supports manual cache clearing from the popup
+
+## Current scope
+
+This version targets repository-level pull request list pages only:
+
+- `https://github.com/<owner>/<repo>/pulls`
+
+It does not modify issue lists or individual pull request detail pages.
+
+## Metadata shown
+
+The extension can show:
+
+- commit count
+- files changed
+- added and deleted line totals
+- last edited time
+- optional cache freshness state
+
+It can also trim GitHub's native metadata line to keep only the pieces you want visible.
 
 ## Project structure
 
@@ -43,9 +66,10 @@ src/
 
 1. Run `bun install`.
 2. Run `bun run build:firefox`.
-3. Open `about:debugging#/runtime/this-firefox`.
-4. Choose `Load Temporary Add-on`.
-5. Select:
+3. Use Firefox 142 or newer.
+4. Open `about:debugging#/runtime/this-firefox`.
+5. Choose `Load Temporary Add-on`.
+6. Select:
 
    `/Users/maximilianmauroner/Documents/GitHub/better-github-pr-view/dist/firefox/manifest.json`
 
@@ -113,19 +137,11 @@ Release flow:
 
 The release workflow fails if the pushed tag does not match `package.json`.
 
-## Public submission pages
+## Submission docs
 
 - Homepage: [`docs/index.md`](./docs/index.md)
 - Privacy policy: [`docs/privacy-policy.md`](./docs/privacy-policy.md)
 - Support: [`docs/support.md`](./docs/support.md)
 - Release checklist: [`docs/release-checklist.md`](./docs/release-checklist.md)
 
-Enable GitHub Pages from the `/docs` directory before submission so those URLs resolve publicly.
-
-## Current scope
-
-This version targets repository-level pull request list pages:
-
-- `https://github.com/<owner>/<repo>/pulls`
-
-It does not currently enrich issue lists or PR detail pages.
+These are repository files linked from the README, not hosted GitHub Pages URLs. If you need public URLs for store submission, publish them separately.

@@ -1,5 +1,7 @@
 interface Settings {
   prListEnrichment: boolean;
+  commitCount: boolean;
+  filesChanged: boolean;
   locChanges: boolean;
   lastEditedTime: boolean;
   nativePrNumber: boolean;
@@ -16,10 +18,13 @@ interface LocChanges {
 
 interface HydratedPrData {
   prUrl: string;
+  commitCount?: number | null;
+  filesChanged?: number | null;
   locChanges?: LocChanges | null;
+  detailMetricsAttemptedAt?: string | null;
   codeMetricsAttemptedAt?: string | null;
   lastActivityAt?: string | null;
-  lastActivityAttemptedAt?: string | null;
+  filesChangedAttemptedAt?: string | null;
   fetchedAt?: string | null;
 }
 
@@ -33,16 +38,23 @@ interface LocMetricsResult {
   codeMetricsAttemptedAt: string;
 }
 
-interface LastEditedMetricsResult {
+interface DetailMetricsResult {
+  commitCount: number | null;
   lastActivityAt: string | null;
-  lastActivityAttemptedAt: string;
+  detailMetricsAttemptedAt: string;
+}
+
+interface FilesChangedMetricsResult {
+  filesChanged: number | null;
+  filesChangedAttemptedAt: string;
 }
 
 interface CacheEntry {
   data: HydratedPrData | null;
   loadedFromStorage: boolean;
-  filesPromise: Promise<LocMetricsResult | null> | null;
-  detailPromise: Promise<LastEditedMetricsResult | null> | null;
+  locMetricsPromise: Promise<LocMetricsResult | null> | null;
+  detailPromise: Promise<DetailMetricsResult | null> | null;
+  filesChangedPromise: Promise<FilesChangedMetricsResult | null> | null;
   isRefreshing: boolean;
   refreshUiMode: "interactive" | null;
   lastAutoRefreshAt: number;
