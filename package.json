@@ -23,10 +23,11 @@
     "@eslint/js": "^10.0.1",
     "@types/chrome": "^0.1.24",
     "@types/node": "^24.5.2",
+    "@typescript/native": "npm:typescript@7.0.2",
     "eslint": "^10.0.3",
     "globals": "^17.4.0",
     "jsdom": "^29.0.0",
-    "typescript": "^5.9.2",
+    "typescript": "6.0.3",
     "typescript-eslint": "^8.57.1",
     "vitest": "^4.1.0",
     "web-ext": "^8.9.0"
