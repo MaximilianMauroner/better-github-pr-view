@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+  <body>
+    <script data-target="react-app.embeddedData" type="application/json">
+      {
+        "payload": {
+          "pullRequestsLayoutRoute": {
+            "pullRequest": {
+              "commitsCount": 12,
+              "baseBranch": "main",
+              "headBranch": "feature/refactor",
+              "headRepositoryOwnerLogin": "octocat"
+            },
+            "repository": {
+              "ownerLogin": "octocat"
+            }
+          }
+        }
+      }
+    </script>
+
+    <nav>
+      <a href="/octocat/hello-world/pull/42/commits" id="prs-commits-anchor-tab">
+        <span class="prc-CounterLabel-CounterLabel-X-kRU">12</span>
+      </a>
+    </nav>
+
+    <section id="partial-timeline">
+      <relative-time datetime="2026-03-14T10:00:00Z"></relative-time>
+      <relative-time datetime="2026-03-17T14:30:00Z"></relative-time>
+      <relative-time datetime="2026-03-16T09:15:00Z"></relative-time>
+    </section>
+  </body>
+</html>

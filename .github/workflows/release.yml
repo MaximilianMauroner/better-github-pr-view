@@ -28,8 +28,8 @@ jobs:
         run: |
           bun -e 'const pkg = JSON.parse(await Bun.file("package.json").text()); const expected = `v${pkg.version}`; const actual = process.env.GITHUB_REF_NAME; if (actual !== expected) { throw new Error(`Tag ${actual} does not match package.json version ${expected}`); }'
 
-      - name: Validate and package release artifacts
-        run: bun run check:release
+      - name: Run repository checks and package release artifacts
+        run: bun run check
 
       - name: Upload Chrome ZIP
         uses: actions/upload-artifact@v6

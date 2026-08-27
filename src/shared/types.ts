@@ -1,4 +1,4 @@
-interface Settings {
+export interface Settings {
   prListEnrichment: boolean;
   branchSummary: boolean;
   commitCount: boolean;
@@ -14,12 +14,12 @@ interface Settings {
   cacheState: boolean;
 }
 
-interface LocChanges {
+export interface LocChanges {
   additions: number;
   deletions: number;
 }
 
-interface HydratedPrData {
+export interface HydratedPrData {
   prUrl: string;
   branchSummary?: string | null;
   commitCount?: number | null;
@@ -32,29 +32,29 @@ interface HydratedPrData {
   fetchedAt?: string | null;
 }
 
-interface PersistedPayload {
+export interface PersistedPayload {
   version: number;
   data: HydratedPrData;
 }
 
-interface LocMetricsResult {
+export interface LocMetricsResult {
   locChanges: LocChanges | null;
   codeMetricsAttemptedAt: string;
 }
 
-interface DetailMetricsResult {
+export interface DetailMetricsResult {
   branchSummary: string | null;
   commitCount: number | null;
   lastActivityAt: string | null;
   detailMetricsAttemptedAt: string;
 }
 
-interface FilesChangedMetricsResult {
+export interface FilesChangedMetricsResult {
   filesChanged: number | null;
   filesChangedAttemptedAt: string;
 }
 
-interface CacheEntry {
+export interface CacheEntry {
   data: HydratedPrData | null;
   loadedFromStorage: boolean;
   locMetricsPromise: Promise<LocMetricsResult | null> | null;
@@ -66,7 +66,7 @@ interface CacheEntry {
   lastRefreshErrorAt: number | null;
 }
 
-interface BaseRow {
+export interface BaseRow {
   row: Element;
   titleLink: HTMLAnchorElement;
   metaNode: HTMLElement | null;
@@ -77,7 +77,7 @@ interface BaseRow {
   isDraft: boolean;
 }
 
-interface NativeMetaSnapshot {
+export interface NativeMetaSnapshot {
   node: HTMLElement;
   originalNodes: Node[];
   numberText: string | null;
@@ -86,5 +86,5 @@ interface NativeMetaSnapshot {
   authorNode: Node | null;
 }
 
-type StorageArea = "local" | "sync";
-type FreshnessState = "fresh" | "soft_stale" | "hard_stale";
+export type StorageArea = "local" | "sync";
+export type FreshnessState = "fresh" | "soft_stale" | "hard_stale";

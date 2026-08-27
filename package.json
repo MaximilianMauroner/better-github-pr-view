@@ -2,24 +2,33 @@
   "name": "better-github-pr-view",
   "version": "0.1.0",
   "private": true,
-  "description": "Release tooling and store metadata for Better GitHub PR View.",
+  "description": "Browser extension for repository pull request list metadata on GitHub.",
   "type": "module",
   "packageManager": "bun@1.3.6",
   "scripts": {
     "build": "bun run build:chrome && bun run build:firefox",
     "build:chrome": "bun run scripts/build.ts chrome",
     "build:firefox": "bun run scripts/build.ts firefox",
-    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.scripts.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.scripts.json && tsc --noEmit -p tsconfig.tests.json",
+    "lint": "eslint src scripts tests --max-warnings=0",
+    "test": "vitest run",
     "pack": "bun run pack:chrome && bun run pack:firefox",
     "pack:chrome": "bun run build:chrome && bun run scripts/pack.ts chrome",
     "pack:firefox": "bun run build:firefox && bun run scripts/pack.ts firefox",
     "lint:firefox": "bun run build:firefox && web-ext lint -s dist/firefox",
-    "check:release": "bun run typecheck && bun run build:chrome && bun run build:firefox && bun run lint:firefox && bun run scripts/check-release.ts && bun run pack:chrome && bun run pack:firefox"
+    "check:release": "bun run typecheck && bun run build:chrome && bun run build:firefox && bun run lint:firefox && bun run scripts/check-release.ts && bun run pack:chrome && bun run pack:firefox",
+    "check": "bun run typecheck && bun run lint && bun run test && bun run check:release"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@types/chrome": "^0.1.24",
     "@types/node": "^24.5.2",
+    "eslint": "^10.0.3",
+    "globals": "^17.4.0",
+    "jsdom": "^29.0.0",
     "typescript": "^5.9.2",
+    "typescript-eslint": "^8.57.1",
+    "vitest": "^4.1.0",
     "web-ext": "^8.9.0"
   }
 }

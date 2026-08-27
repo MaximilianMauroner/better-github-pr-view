@@ -3,7 +3,6 @@
 A Manifest V3 browser extension that adds a compact metadata strip to GitHub repository pull request list rows.
 
 ![Example pull request list enriched by the extension](./assets/store/image.png)
-
 ![Example pull request list un-enriched by the extension](./assets/store/image-2.png)
 
 It is narrowly scoped: on repository `Pull requests` pages, it augments each visible row with information that normally requires opening the PR first.
@@ -13,7 +12,7 @@ It is narrowly scoped: on repository `Pull requests` pages, it augments each vis
 - Enhances repository `Pull requests` pages on `github.com`
 - Adds compact inline row metadata that stays close to GitHub's native styling
 - Surfaces commit count and files changed directly in the list
-- Adds line-change totals and last-edited time
+- Adds line-change totals and latest activity
 - Lets you keep or hide GitHub's native row metadata pieces like PR number, opened time, author, and task progress
 - Hydrates visible rows only, with in-memory caching and bounded fetch concurrency
 - Caches fetched PR metadata locally and supports manual cache clearing from the popup
@@ -33,7 +32,7 @@ The extension can show:
 - commit count
 - files changed
 - added and deleted line totals
-- last edited time
+- latest activity
 - optional cache freshness state
 
 It can also trim GitHub's native metadata line to keep only the pieces you want visible.
@@ -47,10 +46,13 @@ manifest.json
 popup.html
 scripts/
 src/
+  content/
   content.css
   content.ts
   popup.css
   popup.ts
+  shared/
+tests/
 ```
 
 ## Install locally in Chrome
@@ -60,9 +62,7 @@ src/
 3. Open your Chromium-based browser extension page.
 4. Enable Developer Mode.
 5. Choose `Load unpacked`.
-6. Select:
-
-   `/Users/maximilianmauroner/Documents/GitHub/better-github-pr-view/dist/chrome`
+6. Select `dist/chrome`.
 
 ## Install locally in Firefox
 
@@ -71,9 +71,7 @@ src/
 3. Use Firefox 142 or newer.
 4. Open `about:debugging#/runtime/this-firefox`.
 5. Choose `Load Temporary Add-on`.
-6. Select:
-
-   `/Users/maximilianmauroner/Documents/GitHub/better-github-pr-view/dist/firefox/manifest.json`
+6. Select `dist/firefox/manifest.json`.
 
 ## Build and package
 
@@ -117,6 +115,14 @@ This command:
 - runs `web-ext lint` on the Firefox build
 - verifies store docs and required assets exist
 - creates versioned ZIP artifacts
+
+For the broader repository check used in CI, run:
+
+```bash
+bun run check
+```
+
+This adds ESLint and Vitest on top of the release packaging flow.
 
 ## GitHub downloads
 

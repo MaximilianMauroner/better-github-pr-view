@@ -15,7 +15,22 @@ const requiredFiles = [
   "assets/extension-icons/icon-128.png"
 ];
 
-async function assertFile(relativePath: string) {
+interface BuildManifest {
+  version?: string;
+  icons?: Record<string, string>;
+  browser_specific_settings?: {
+    gecko?: {
+      id?: string;
+      strict_min_version?: string;
+      data_collection_permissions?: {
+        required?: string[];
+        optional?: string[];
+      };
+    };
+  };
+}
+
+async function assertFile(relativePath: string): Promise<void> {
   await access(path.join(repoRoot, relativePath));
 }
 
@@ -23,8 +38,12 @@ async function main() {
   const packageManifest = await readPackageManifest();
   await Promise.all(requiredFiles.map(assertFile));
 
-  const chromeManifest = JSON.parse(await readFile(path.join(repoRoot, "dist", "chrome", "manifest.json"), "utf8")) as Record<string, any>;
-  const firefoxManifest = JSON.parse(await readFile(path.join(repoRoot, "dist", "firefox", "manifest.json"), "utf8")) as Record<string, any>;
+  const chromeManifest = JSON.parse(
+    await readFile(path.join(repoRoot, "dist", "chrome", "manifest.json"), "utf8")
+  ) as BuildManifest;
+  const firefoxManifest = JSON.parse(
+    await readFile(path.join(repoRoot, "dist", "firefox", "manifest.json"), "utf8")
+  ) as BuildManifest;
 
   if (chromeManifest.version !== packageManifest.version || firefoxManifest.version !== packageManifest.version) {
     throw new Error("Build outputs must use the version declared in package.json.");
