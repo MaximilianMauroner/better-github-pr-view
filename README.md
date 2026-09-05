@@ -111,7 +111,7 @@ bun run check:release
 This command:
 
 - typechecks the extension and Bun scripts
-- builds Chrome and Firefox packages
+- builds Chrome and Firefox once each
 - runs `web-ext lint` on the Firefox build
 - verifies store docs and required assets exist
 - creates versioned ZIP artifacts
@@ -122,7 +122,10 @@ For the broader repository check used in CI, run:
 bun run check
 ```
 
-This adds ESLint and Vitest on top of the release packaging flow.
+This adds ESLint and Vitest on top of the release packaging flow. Typechecking
+runs once. The release check validates and packages the outputs it just built.
+Standalone `pack:chrome`, `pack:firefox`, and `lint:firefox` commands still build
+their own fresh output.
 
 ## GitHub downloads
 
