@@ -16,8 +16,8 @@
     "pack:chrome": "bun run build:chrome && bun run scripts/pack.ts chrome",
     "pack:firefox": "bun run build:firefox && bun run scripts/pack.ts firefox",
     "lint:firefox": "bun run build:firefox && web-ext lint -s dist/firefox",
-    "check:release": "bun run typecheck && bun run build:chrome && bun run build:firefox && bun run lint:firefox && bun run scripts/check-release.ts && bun run pack:chrome && bun run pack:firefox",
-    "check": "bun run typecheck && bun run lint && bun run test && bun run check:release"
+    "check:release": "bun run typecheck && bun run build && web-ext lint -s dist/firefox && bun run scripts/check-release.ts && bun run scripts/pack.ts chrome && bun run scripts/pack.ts firefox",
+    "check": "bun run lint && bun run test && bun run check:release"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
